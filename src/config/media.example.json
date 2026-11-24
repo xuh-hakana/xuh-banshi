@@ -1,0 +1,54 @@
+{
+  "_说明": "视频工坊配置。缺键全走默认，改这里立即生效；keys 段可覆盖 AstrBot 的 key（一般不用写）。",
+  "version": 1,
+  "keys": {},
+  "llm": {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "timeoutMs": 60000
+  },
+  "visual": {
+    "provider": "zhipu",
+    "imageModel": "cogview-3-flash",
+    "videoModel": "cogvideox-flash",
+    "pollIntervalMs": 5000,
+    "pollTimeoutMs": 480000
+  },
+  "tts": {
+    "provider": "edge",
+    "voice": "zh-CN-XiaoxiaoNeural",
+    "fallbackSayVoice": "Tingting",
+    "rate": 1
+  },
+  "music": {
+    "provider": "proc",
+    "bpm": 96,
+    "mood": "calm",
+    "gainDb": -18
+  },
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "shots": 5,
+    "shotSeconds": 5,
+    "crf": 23,
+    "preset": "veryfast"
+  },
+  "publish": {
+    "tid": 188,
+    "tidName": "科技",
+    "tags": [
+      "AI生成",
+      "AI视频",
+      "视频工坊"
+    ],
+    "copyright": 1,
+    "dryRunDefault": true,
+    "isOnlySelf": false
+  },
+  "paths": {
+    "jobs": "data/videojobs",
+    "vendor": "data/vendor"
+  }
+}

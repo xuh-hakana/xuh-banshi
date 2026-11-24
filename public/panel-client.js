@@ -709,7 +709,7 @@ function openTab(fileId, path) {
 /* ---------- 已关闭：按「文件 + 层级」分行记 ---------- */
 function lvKey(fid, lv) { return fid + '#' + lv; }
 // 不是 md 文件的「合成页」：聊天记录 / 数据表 / 触发地图 / 话题日志 / 看某人
-function isSynthetic(fid) { return fid === '__chat' || fid === '__map' || fid === '__log' || fid === '__topic' || fid === '__topics' || fid === '__promise' || fid === '__who' || fid === '__memes' || fid === '__memedict' || fid === '__triggers' || fid === '__features' || fid === '__updates' || fid === '__reqs' || fid === '__feedback' || fid === '__people' || fid === '__thinking' || String(fid).indexOf('__table_') === 0 || String(fid).indexOf('__html_') === 0 || String(fid).indexOf('__raw_') === 0; }
+function isSynthetic(fid) { return fid === '__chat' || fid === '__map' || fid === '__log' || fid === '__topic' || fid === '__topics' || fid === '__promise' || fid === '__who' || fid === '__memes' || fid === '__memedict' || fid === '__triggers' || fid === '__features' || fid === '__updates' || fid === '__reqs' || fid === '__feedback' || fid === '__people' || fid === '__thinking' || fid === '__multitruth' || String(fid).indexOf('__table_') === 0 || String(fid).indexOf('__html_') === 0 || String(fid).indexOf('__raw_') === 0; }
 
 function pushClosed(fileId, t, pos) {
   var key = lvKey(fileId, t.path.length);
@@ -1670,6 +1670,10 @@ function renderThinking(t, box) {
   var ask = el('button', 'cdel', '让她下一轮想给我看');
   ask.title = '点一下，她下一轮回答时会开着思考；想的内容会存进这一页（只生效一轮，不会一直开着的）';
   bar.appendChild(ask);
+  var mtb = el('button', 'cdel', '看多重真相');
+  mtb.title = '后台那条流水线（接话复核 / 群友视角 / 记录员）到底看到了什么';
+  mtb.onclick = function () { openMultiTruth(); };
+  bar.appendChild(mtb);
   box.appendChild(bar);
   var hint = el('div', 'gy', '平时是关着的——开着思考会慢好几秒，正文还容易空。所以想看的时候点一下，再去跟她说话。');
   hint.style.margin = '6px 0 10px';
@@ -1728,6 +1732,90 @@ function renderThinking(t, box) {
       }
       box.appendChild(c);
     });
+  }).catch(function () {
+    loading.parentNode && loading.parentNode.removeChild(loading);
+    box.appendChild(el('div', 'empty', '读不出来，刷新一下试试'));
+  });
+}
+
+/* ---------- 多重真相（2026-11-25） ----------
+ * 后台那条流水线到底看到了什么：接话复核（judge）、群友视角（views）、记录员结论（recorder），
+ * 外加当前会话 inbox 的尾巴。只读展示，一个字的判断都不在这里做。 */
+function openMultiTruth() {
+  openPage('__multitruth', function () {
+    return { fileId: '__multitruth', path: [], titles: ['多重真相'], title: '多重真相', name: '多重真相' };
+  }, function () {});
+}
+function renderMultiTruth(t, box) {
+  box.appendChild(el('div', 'crumb'));
+  box.appendChild(el('h1', 'pg', '多重真相'));
+  box.appendChild(el('p', 'pgsub', '后台按三个角色看的：接话复核、群友各自视角、记录员结论。只读，判断都在后台图里做。'));
+
+  var bar = el('div', 'taddrow');
+  var run = el('button', 'cdel', '现在跑一次');
+  run.title = '拿最近那个群的 inbox 立刻跑一遍；两次之间至少隔 10 秒，10 秒内点了会说「节流中」';
+  bar.appendChild(run);
+  var back = el('button', 'cdel', '回到她的思考');
+  back.onclick = function () { openThinking(); };
+  bar.appendChild(back);
+  box.appendChild(bar);
+
+  var loading = el('div', 'empty', '正在读取…');
+  box.appendChild(loading);
+
+  var status = el('div', 'gy', '');
+  box.appendChild(status);
+  var kickK = '';
+
+  run.onclick = function () {
+    if (!kickK) { toast('还不知道是哪个群，先等这页读出来'); return; }
+    run.disabled = true;
+    POST('/api/multitruth/kick', { k: kickK }).then(function (r) {
+      run.disabled = false;
+      if (!r || !r.ok) { toast((r && r.error) || '没跑起来'); return; }
+      toast('已经派给后台了，跑完刷新这页看');
+      status.textContent = '已派出：' + kickK + '（后台跑，几秒到十几秒）';
+    }).catch(function () { run.disabled = false; toast('没跑起来'); });
+  };
+
+  function sec(title, body, emptyText) {
+    var d = el('details');
+    d.open = true;
+    var s = el('summary', null, title);
+    s.style.cssText = 'font-size:13px;font-weight:600;cursor:pointer;margin:14px 0 6px';
+    d.appendChild(s);
+    var pre = el('div', null, body ? String(body) : (emptyText || '（还没有内容）'));
+    pre.style.cssText = 'white-space:pre-wrap;font-size:12.5px;line-height:1.6;background:var(--bg);border:1px solid var(--bd2);border-radius:6px;padding:8px 10px';
+    d.appendChild(pre);
+    return d;
+  }
+
+  api('/api/multitruth?n=20').then(function (r) {
+    loading.parentNode && loading.parentNode.removeChild(loading);
+    var latest = (r && r.latest) || null;
+    var inbox = (r && r.inbox) || [];
+    if (inbox.length && inbox[0] && inbox[0].k) kickK = String(inbox[0].k);
+    else if (latest && latest.k) kickK = String(latest.k);
+
+    if (latest) {
+      var hd = el('div', 'gy', '记录员最近一次结论：' + String(latest.k || '') + '　·　' +
+        (latest.at ? new Date(Number(latest.at)).toLocaleString() : '时间未知') +
+        (latest.stale ? '　·　可能已经旧了' : ''));
+      hd.style.margin = '8px 0';
+      box.appendChild(hd);
+    } else {
+      box.appendChild(el('div', 'empty', '后台还没产出过结论——等群里有动静，或点上面「现在跑一次」'));
+    }
+
+    box.appendChild(sec('接话复核（judge）', (r && r.judge) || ''));
+    box.appendChild(sec('群友视角（views）', (r && r.views) || ''));
+    box.appendChild(sec('记录员结论（recorder）', (r && r.recorder) || ''));
+
+    var rows = inbox.map(function (x) {
+      var tt = String(x.t || '').replace('T', ' ').slice(0, 19);
+      return tt + '　' + (x.nick || x.uid || '?') + '：' + String(x.text || '').slice(0, 120);
+    }).join('\n');
+    box.appendChild(sec('最近的消息队列（' + inbox.length + ' 条）', rows, '（这个群还没有待分析的消息）'));
   }).catch(function () {
     loading.parentNode && loading.parentNode.removeChild(loading);
     box.appendChild(el('div', 'empty', '读不出来，刷新一下试试'));
@@ -3765,6 +3853,10 @@ function renderContentBody(box) {
   if (t.fileId === '__thinking') {
     if (composer) composer.style.display = 'none';
     renderThinking(t, box); return;
+  }
+  if (t.fileId === '__multitruth') {
+    if (composer) composer.style.display = 'none';
+    renderMultiTruth(t, box); return;
   }
   if (t.fileId === '__updates') {
     if (composer) composer.style.display = 'none';

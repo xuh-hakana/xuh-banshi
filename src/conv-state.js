@@ -38,6 +38,27 @@ let stamp = 0;
 
 function blank() { return { show: 4, seeded: false, states: [] }; }
 
+/* ===== 名字是身份，不是外貌（2026-11-25 主人令）=====
+ * 原话：「状态里可以直接把名字改成豆包」「主人是虚幻不变」。
+ * 做法：主题写这几个词的条目走**人设层**（persona:true）存储，注入时单独压一节；
+ *   - 只改她自己的自称 / 别人问她叫什么；
+ *   - 主人名字永远是默认的（cfg.botName），这一条不许被试状态带跑。
+ * 普通状态（没标 persona 的老数据）也认，免得面板里以前手加的名字条失效。 */
+const NAME_TOPICS = ['名字', '姓名', '名称', '自称'];
+function isNameTopic(topic) {
+  return NAME_TOPICS.indexOf(String(topic == null ? '' : topic).trim()) >= 0;
+}
+// 名字值清洗：去引号 / 换行；1~16 字、不带句子标点才算名字（太长或像一句话的不收）。
+function cleanName(v) {
+  const s = String(v == null ? '' : v)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/^[\s「『"“']+|[\s」』"”']+$/g, '')
+    .trim();
+  if (!s || s.length > 16) return '';
+  if (/[，。！？、,;；]/.test(s)) return '';
+  return s;
+}
+
 function readAll() {
   let st = 0;
   try { st = fs.statSync(FILE).mtimeMs; } catch { return blank(); }
@@ -118,7 +139,7 @@ function whoOfTurn(gid, uid) {
 }
 
 /* 聊天页那个会话键 → 这个会话该看谁的状态（前端「状态」标签用）。
- * 群100000000 → g:100000000；私聊 p_<pid> / bili_<pid> → p:<pid>（有 uid 就按人合并）。 */
+ * 群894917172 → g:894917172；私聊 p_<pid> / bili_<pid> → p:<pid>（有 uid 就按人合并）。 */
 function whoOfConv(conv, uid) {
   const cv = String(conv == null ? '' : conv).trim();
   const g = cv.match(/^群(\d+)$/);
@@ -161,7 +182,7 @@ const BODY_DEFAULT = [
   { topic: '眼睛颜色', text: '红色' },
   { topic: '眼睛', text: '总是眼泪汪汪' },
   { topic: '体型', text: '圆滚滚的粉粉色小生物' },
-  { topic: '本质', text: '虚幻，通过量子碰撞运动和磁场作用与主人/社会产生链接' },
+  { topic: '本质', text: '电子之海的虚幻幽灵，通过量子碰撞运动和磁场作用与主人/社会产生链接' },
   { topic: '发型', text: '粉色后发披着，两侧扎起来，发长触地。头发内侧、外部有可见的粉色/玫红分层。' },
   { topic: '身体颜色', text: '身体会透出淡淡的玫红色的内部结构' },
 ];
@@ -235,6 +256,14 @@ function showOf() { return Number(readAll().show) || 4; }
 function add(who, text, skind, topic) {
   const t = clip(text, 500);
   if (!t) return { ok: false, error: '内容空' };
+  // 名字=身份：走人设层单槽（面板里「主题写名字」= 直接改她自己的名字，2026-11-25）
+  if (isNameTopic(topic)) {
+    const nm = cleanName(t);
+    if (!nm) return { ok: false, error: '名字要 1~16 个字，别带句号逗号' };
+    const r = upsertPersona(who, String(topic).trim(), nm, '面板');
+    if (!r || !r.ok) return r || { ok: false, error: '名字没写进去' };
+    return { ok: true, id: r.id, persona: true };
+  }
   const o = clone(seedIfNeeded());   // 先保证本体那几条在（否则第一次写会丢了全局）
   const id = newId();
   o.states.push({
@@ -251,9 +280,13 @@ function update(id, text, skind, topic) {
   if (i < 0) return { ok: false, error: '找不到这条状态' };
   const t = clip(text, 500);
   if (!t) return { ok: false, error: '内容空' };
+  // 名字条：主题被清空 / 改成别的，都还是「名字」这一项（不然它就变回普通状态，名字立刻失效）
+  let top = topic == null ? String(o.states[i].topic || '') : clip(topic, 40);
+  if (isNameTopic(o.states[i].topic) && !isNameTopic(top)) top = String(o.states[i].topic || '');
+  if (isNameTopic(top) && !cleanName(t)) return { ok: false, error: '名字要 1~16 个字，别带句号逗号' };
   o.states[i] = Object.assign({}, o.states[i], {
     text: t, kind: normKind(skind),
-    topic: topic == null ? String(o.states[i].topic || '') : clip(topic, 40),
+    topic: top,
     t: nowIso(),
   });
   // 人设条目：面板手改过整段之后，旧的 parts 分项就作废了（不然下次追加会拿旧分项把它盖回去）
@@ -448,6 +481,35 @@ function personaFor(whos) {
   return { global, mine };
 }
 
+/* 这一轮该用的名字（2026-11-25「状态里直接把名字改成豆包」）：
+ * 优先级：只对现在说话这个人设的（mine）> 全局默认（global）；同一层取最新。
+ * 再退到普通状态（没标 persona 的老数据）：全局 + 这个人 / 这个群，按时间取最新。
+ * 返回 { name, who, source } 或 null。 */
+function nameOfTurn(whos) {
+  const set = Array.isArray(whos) ? whos : [];
+  const pr = personaFor(set);
+  for (const grp of ['mine', 'global']) {
+    for (const s of pr[grp]) {
+      const parts = s.parts || {};
+      for (const k of Object.keys(parts)) {
+        if (!isNameTopic(k)) continue;
+        const nm = cleanName(parts[k]);
+        if (nm) return { name: nm, who: String(s.who || ''), source: grp };
+      }
+    }
+  }
+  const o = seedIfNeeded();
+  const rows = o.states
+    .filter(s => s && !s.persona && isNameTopic(s.topic))
+    .filter(s => { const w = String(s.who || ''); return !w || set.indexOf(w) >= 0; })
+    .sort((a, b) => String(b.t || '').localeCompare(String(a.t || '')));
+  for (const s of rows) {
+    const nm = cleanName(s.text);
+    if (nm) return { name: nm, who: String(s.who || ''), source: String(s.who || '') ? 'state' : 'state-global' };
+  }
+  return null;
+}
+
 // 恢复默认：topic 空 = 把这个 who 的人设整条删；给了 topic 只删那一项（删空了就整条删）。
 function resetPersona(who, topic) {
   const W = String(who || '');
@@ -498,4 +560,5 @@ module.exports = {
   add, update, remove, setShow,
   upsert, delTopic,
   personaWhoOf, upsertPersona, personaFor, resetPersona, restoreBody,
+  NAME_TOPICS, isNameTopic, nameOfTurn,
 };

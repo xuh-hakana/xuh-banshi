@@ -1,0 +1,20 @@
+{
+  "enable": {
+    "type": "bool",
+    "description": "总开关",
+    "hint": "关掉立刻恢复 AstrBot 原本的样子，不改配置、不动历史记录",
+    "default": true
+  },
+  "persona_path": {
+    "type": "string",
+    "description": "人设文件路径",
+    "hint": "留空就用 QQ 机器人那份：~/Documents/WorkBuddy/qq虚幻/qq-companion-bot/persona/1-人设正文/虚幻.md",
+    "default": ""
+  },
+  "common_rules_path": {
+    "type": "string",
+    "description": "公共规则层文件路径（发送前最后一道闸）",
+    "hint": "留空就不注入。填了就每轮常驻：只取文件里 ```text 围栏块里的正文（说明、表格、来源注释一律不带）。AstrBot 没有 QQ 机器人那套代码规则，这层只能靠提示词补",
+    "default": ""
+  }
+}

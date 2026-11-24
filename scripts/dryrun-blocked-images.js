@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const censor = require('../src/bili-censor');
 const core = require('../src/core');
 
-const O = '/Users/zhengbowen/.dsh/attachments/v1/objects';
+const O = '~/.dsh/attachments/v1/objects';
 const FILES = [
   ['A1 q累16', O + '/f0/f0c2c51a112b474ea78637a805c1be7020d5927943a05385b0b7237e80258699'],
   ['A2 q累17', O + '/02/024e2e7bb4b3657f2a7e47c6a38c4a722061dd891c0af81d20438436dcb9fab7'],

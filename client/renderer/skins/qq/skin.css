@@ -1,0 +1,639 @@
+/* ===========================================================================
+ * app/renderer/skins/qq/skin.css — 聊天记录页的 QQ 皮肤插件
+ *
+ * 这是干什么的：把「聊天记录」页做成 QQ 的样子 —— 左边会话栏（群聊 / 私聊分开），
+ *   右边聊天气泡；浅灰窗口底、白色对方气泡 / 蓝色自己气泡、昵称与时间、居中日期。
+ * 视角（主人 2026-11-07 定）：按「虚幻的视角」，不是主人的视角。
+ *   QQ 里「我」= 当前登录的账号 = 虚幻 → 虚幻说的话靠右、蓝色气泡、用她自己的头像；
+ *   主人和群友都是「对方」，靠左、白色气泡。会话栏顶部也显示虚幻自己的头像。
+ * 怎么装：index.html 里那一行 <link rel="stylesheet" href="skins/qq/skin.css">；
+ *   怎么卸：删掉那一行即可，回到原来的紧凑列表样式（app.js / app.css 都不用改回去）。
+ * 为什么是纯 CSS：客户端是原生 JS（app.js 直接拼 HTML 字符串，无 Vue、无打包器），
+ *   装 Vue 组件库要引一整套构建链；这份皮肤只覆盖既有 DOM，零依赖、可插拔。
+ *   聊天记录里的消息本来就是真 QQ 的消息（NapCat 接进来写进 chat-log.jsonl），
+ *   「接 QQ」这一步早就完成了，这里补的是界面长得像 QQ。
+ * 作用域：全部规则写在 .view:has(.msgs) 下 —— 只有带消息容器的聊天记录页生效，
+ *   约定页、表情包页、其它页一律不受影响（约定页也用 .pact-bar，所以必须限定）。
+ * 视觉依据：QQ NT for Windows（左侧会话栏、对方白气泡、自己蓝气泡、圆角方头像）。
+ *   查过的现成实现：Redlnn/FakeQQ-UI（Vue 组件库，未引入）、
+ *   Qiuziscorpio/-qq-UI 与 10MINT/chat-css（纯 CSS / MIT，只作样式参照，未复制代码）。
+ * 老功能不动：搜索、只看她说的、只看星标、长文展开、→某人、标错、待修复，全部保留。
+ * 头像来源：src/data/stickers/虚幻/哭.jpg（原表情包目录里的那张，不复制、不另存一份）。
+ *   走客户端已有的 xuh://stickers/ 自定义协议，CSP 的 img-src 已放行 xuh:。
+ * =========================================================================== */
+
+/* 虚幻的头像只在这一处定义：换图只改这一行，消息气泡和会话栏顶部一起变 */
+.view:has(.msgs) {
+  --bot-avatar: url("xuh://stickers/%E8%99%9A%E5%B9%BB/%E5%93%AD.jpg");
+}
+
+/* ---------- 两栏：左会话栏 + 右聊天区，各自独立滚动（主人 2026-11-07） ----------
+ * 以前两栏都跟着整页一起滚，翻消息时会话栏也跟着跑。现在给容器定高，
+ * 两栏各滚各的：左边选会话、右边翻聊天，互不带动。
+ * 2026-11-08 修（主人「翻动列表操作有问题」）：原来的 `height: calc(100vh - 190px)` 是猜的魔法数，
+ * 和顶栏 / 工具条的真实高度对不上 → 外层 .view 还会整页滚一层，于是「滚消息的同时整页在跑」。
+ * 现在改成 flex 撑满：聊天页自己不出滚动条，只有会话栏和消息区各滚各的，窗口任何高度都对。 */
+.view:has(.msgs) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;        /* 整页不再滚 */
+  min-height: 0;
+}
+.view:has(.msgs) .chat-wrap {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 12px;
+  flex: 1 1 auto;          /* 撑满剩余高度，不再用 100vh 猜 */
+  height: auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+/* 顶部工具栏（搜索 / 筛选）：白卡片，和消息区分层。
+ * flex: none —— 聊天页现在是「工具条固定 + 下面撑满」，工具条不许被压扁。 */
+.view:has(.msgs) .pact-bar {
+  flex: none;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E6EAF1;
+  border-radius: 12px;
+}
+.view:has(.msgs) .pact-bar .field {
+  border-color: #E1E6EF;
+  background: #F7F9FC;
+  border-radius: 8px;
+}
+.view:has(.msgs) .pact-bar .chip.is-on {
+  color: #0B87D6;
+  border-color: rgba(18, 183, 245, .45);
+  background: #EAF7FF;
+}
+
+/* ---------- 左：QQ 的会话列表 ---------- */
+.view:has(.msgs) .chat-convs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  background: #FFFFFF;
+  border: 1px solid #E6EAF1;
+  border-radius: 12px;
+}
+/* 登录账号 = 虚幻，放最上面，这就是「虚幻的视角」 */
+.view:has(.msgs) .conv-me {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #EFF2F7;
+}
+.view:has(.msgs) .conv-me-av {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: #F6DDE2 var(--bot-avatar) center / cover no-repeat;
+  box-shadow: 0 0 0 1px rgba(24, 32, 48, .08);
+}
+.view:has(.msgs) .conv-me-txt { display: flex; flex-direction: column; line-height: 1.5; min-width: 0; }
+.view:has(.msgs) .conv-me-txt b { font-size: 13px; color: #20242B; font-weight: 600; }
+.view:has(.msgs) .conv-me-txt span { font-size: 10.5px; color: #9AA2AF; }
+
+.view:has(.msgs) .conv-head {
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5B6270;
+}
+.view:has(.msgs) .conv-head .dim { font-size: 10.5px; font-weight: 400; }
+.view:has(.msgs) .conv-sec {
+  margin-top: 6px;
+  padding: 9px 8px 4px;
+  border-top: 1px solid #F0F2F6;
+  font-size: 10.5px;
+  color: #9AA2AF;
+}
+.view:has(.msgs) .conv {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.view:has(.msgs) .conv:hover { background: #F5F8FC; }
+.view:has(.msgs) .conv.is-on { background: #E7F4FF; }
+.view:has(.msgs) .conv.is-on .conv-name { color: #0B87D6; font-weight: 600; }
+.view:has(.msgs) .conv-av {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: #FFFFFF;
+  font-size: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3);
+}
+.view:has(.msgs) .conv-av.is-all { background: linear-gradient(145deg, #A9BEDB, #6E88B0); }
+.view:has(.msgs) .conv-av.is-group { background: linear-gradient(145deg, #93D9B8, #48A77F); }
+.view:has(.msgs) .conv-av.is-private,
+.view:has(.msgs) .conv-av.is-qq { background: linear-gradient(145deg, #FFB1CD, #E8608F); }
+/* 每个平台一个颜色（2026-11-07）：B站 用它的粉蓝，没存的早期记录用灰，一眼能分开 */
+.view:has(.msgs) .conv-av.is-bili { background: linear-gradient(145deg, #7FD8F5, #00A1D6); }
+.view:has(.msgs) .conv-av.is-orphan { background: linear-gradient(145deg, #D6DAE1, #A8AFBA); }
+.view:has(.msgs) .conv-main { display: flex; flex-direction: column; min-width: 0; line-height: 1.45; }
+.view:has(.msgs) .conv-name {
+  font-size: 12.5px;
+  color: #20242B;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view:has(.msgs) .conv-last {
+  font-size: 10.5px;
+  color: #A6ACB8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 会话名后的小徽标：黑（黑名单）/ 静（不回话）/ 本（本地模型优先）。
+ * 2026-11-11 加「本」：和黑/静用同一套小标签，颜色区分开（本=本地绿）。 */
+.view:has(.msgs) .conv-mute {
+  flex: none;
+  margin-left: 5px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #B0573A;
+  background: #FBE9E0;
+}
+.view:has(.msgs) .conv-mute.conv-local {
+  color: #2E8B57;
+  background: #E3F5EA;
+}
+.view:has(.msgs) .conv-n {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #A6ACB8;
+}
+/* 群会话的 ✎：点它只改群名，不切换会话 */
+.view:has(.msgs) .conv-edit {
+  flex: none;
+  margin-left: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #A6ACB8;
+  font-size: 11px;
+  line-height: 1;
+}
+.view:has(.msgs) .conv-edit:hover { color: #0B87D6; background: #EAF7FF; }
+
+/* ---------- 右：QQ 的消息区 ---------- */
+.view:has(.msgs) .msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px 40px;
+  min-height: 0;
+  overflow-y: auto;
+  background: #F4F6F9;
+  border: 1px solid #E6EAF1;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+/* QQ 顺序：旧消息在上、最新一句在底下，打开就贴到底。日期胶囊不会被拉长 */
+.view:has(.msgs) .msgs .msg-day { flex: none; }
+
+/* 日期分隔：QQ 里居中、很淡的一小条，不是通栏横线 */
+.view:has(.msgs) .msgs .msg-day {
+  align-self: center;
+  margin: 4px 0 0;
+  padding: 2px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(120, 132, 154, .11);
+  color: #8A91A0;
+  font-family: var(--sans);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.view:has(.msgs) .msgs .empty { align-self: center; color: #8A91A0; }
+
+/* ---------- 一条消息 = 头像 + 昵称/时间一行 + 气泡一行 ---------- */
+.view:has(.msgs) .msgs .msg {
+  display: grid;
+  /* acts 紧跟时间在气泡这一侧；末尾 1fr 只是占位，不能让按钮被推到窗口边缘 */
+  grid-template-columns: 38px max-content max-content max-content minmax(0, 1fr);
+  grid-template-areas:
+    "av nick time acts rest"
+    "av body body body body";
+  column-gap: 9px;
+  row-gap: 4px;
+  align-items: start;
+  justify-items: start;
+  padding: 2px 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.view:has(.msgs) .msgs .msg:hover { background: transparent; }
+
+/* 头像：群友 / 主人没有真实头像图，用 QQ 默认头像那种人形剪影 + 身份色 */
+.view:has(.msgs) .msgs .msg::before {
+  content: '';
+  grid-area: av;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, .95) 0 17%, transparent 18%),
+    radial-gradient(ellipse 46% 30% at 50% 92%, rgba(255, 255, 255, .92) 0 62%, transparent 63%),
+    linear-gradient(145deg, #B9CBE4, #8299BE);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35), 0 1px 2px rgba(20, 30, 50, .10);
+}
+.view:has(.msgs) .msgs .msg.is-mine::before {
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, .95) 0 17%, transparent 18%),
+    radial-gradient(ellipse 46% 30% at 50% 92%, rgba(255, 255, 255, .92) 0 62%, transparent 63%),
+    linear-gradient(145deg, #FFB1CD, #E8608F);
+}
+/* 群友 / 主人：查到 QQ 号就用真头像（xuh://avatar/<号>，按需下载并缓存）。
+ * 放在 is-mine 之后 → 有号就盖掉粉色剪影；没查到号的人仍是上面的默认剪影。
+ * is-bot 的规则在最后，虚幻始终用 哭.jpg，不会被 QQ 头像盖掉。 */
+.view:has(.msgs) .msgs .msg.has-av::before {
+  background: #EEF2F7 var(--msg-avatar) center / cover no-repeat;
+  box-shadow: 0 0 0 1px rgba(24, 32, 48, .10), 0 1px 2px rgba(20, 30, 50, .12);
+}
+/* 虚幻：用主人给的 哭.jpg（原图在表情包目录，不复制） */
+.view:has(.msgs) .msgs .msg.is-bot::before {
+  background: #F6DDE2 var(--bot-avatar) center / cover no-repeat;
+  box-shadow: 0 0 0 1px rgba(24, 32, 48, .10), 0 1px 2px rgba(20, 30, 50, .12);
+}
+
+/* 昵称 / 时间：气泡上方一行小灰字 */
+.view:has(.msgs) .msgs .msg .msg-n {
+  grid-area: nick;
+  max-width: 220px;
+  color: #8A91A0;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view:has(.msgs) .msgs .msg.is-mine .msg-n { color: #C46C90; }
+.view:has(.msgs) .msgs .msg.is-bot .msg-n { color: #4E9878; }
+.view:has(.msgs) .msgs .msg .msg-t {
+  grid-area: time;
+  flex: none;
+  padding: 0;
+  color: #A6ACB8;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.7;
+}
+
+/* 气泡：对方白、左上一个小尖角 */
+.view:has(.msgs) .msgs .msg .msg-x {
+  grid-area: body;
+  position: relative;
+  justify-self: start;
+  width: fit-content;
+  max-width: min(680px, 100%);
+  padding: 8px 12px;
+  border: 1px solid #E7EBF2;
+  border-radius: 4px 12px 12px 12px;
+  background: #FFFFFF;
+  color: #20242B;
+  box-shadow: 0 1px 2px rgba(24, 32, 48, .05);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.view:has(.msgs) .msgs .msg .msg-x::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: -5px;
+  width: 9px;
+  height: 9px;
+  background: #FFFFFF;
+  border-left: 1px solid #E7EBF2;
+  border-bottom: 1px solid #E7EBF2;
+  transform: rotate(45deg);
+  border-radius: 0 0 0 2px;
+}
+.view:has(.msgs) .msgs .msg .msg-x .msg-more { color: #0B87D6; font-size: 11px; margin-top: 5px; }
+.view:has(.msgs) .msgs .msg .msg-x .msg-to { display: block; margin-top: 4px; font-size: 11px; color: #9AA2AF; }
+
+/* 消息操作（星标 / 标错）：放在昵称那一行的两端，hover 才显；已加星的一直显 */
+.view:has(.msgs) .msgs .msg .msg-acts {
+  grid-area: acts;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .12s;
+}
+.view:has(.msgs) .msgs .msg:hover .msg-acts,
+.view:has(.msgs) .msgs .msg.is-starred .msg-acts { opacity: 1; }
+/* 标错按钮在 app.css 里自己也带 opacity:0（旧列表样式的 hover 规则）；
+ * 这里交给 .msg-acts 统一管显隐，免得 hover 时只冒出星标、标错还是看不见。 */
+.view:has(.msgs) .msgs .msg .msg-issue { opacity: 1; }
+.view:has(.msgs) .msgs .msg .msg-star,
+.view:has(.msgs) .msgs .msg .msg-issue {
+  margin: 0;
+  padding: 2px 7px;
+  border: 1px solid #E1E6EF;
+  border-radius: 6px;
+  background: #FFFFFF;
+  color: #98A0AE;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.view:has(.msgs) .msgs .msg .msg-star:hover { border-color: #E3B23C; color: #C9901B; }
+.view:has(.msgs) .msgs .msg .msg-star.is-on { color: #D9A227; border-color: #EBCB7C; background: #FFF8E3; }
+.view:has(.msgs) .msgs .msg .msg-issue:hover { border-color: var(--red, #D9534F); color: var(--red, #D9534F); }
+
+/* ---------- 虚幻自己说的：整条靠右、蓝色气泡（QQ 里「我」发的） ---------- */
+.view:has(.msgs) .msgs .msg.is-bot {
+  grid-template-columns: minmax(0, 1fr) max-content max-content max-content 38px;
+  grid-template-areas:
+    "rest acts time nick av"
+    "body body body body av";
+  justify-items: end;
+  text-align: right;
+}
+.view:has(.msgs) .msgs .msg.is-bot .msg-acts { justify-self: end; }
+.view:has(.msgs) .msgs .msg.is-bot .msg-x {
+  justify-self: end;
+  text-align: left;
+  border-color: #0AA5F0;
+  border-radius: 12px 4px 12px 12px;
+  background: linear-gradient(135deg, #2BBEFF, #0A9BF0);
+  color: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(10, 155, 240, .18);
+}
+.view:has(.msgs) .msgs .msg.is-bot .msg-x::before {
+  left: auto;
+  right: -5px;
+  background: #139FE9;
+  border: 0;
+  border-radius: 0;
+}
+.view:has(.msgs) .msgs .msg.is-bot .msg-x .msg-more { color: #EAF8FF; }
+.view:has(.msgs) .msgs .msg.is-bot .msg-x .msg-to { color: rgba(255, 255, 255, .78); }
+
+/* ---------- 多选上下文：QQ 的消息多选样式（圆形勾选圈 + 选中整行淡蓝） ----------
+ * 加星和标错共用这一套（主人 2026-11-07：「多选用 QQ 的样式」「错误也能多选」）。 */
+.view:has(.msgs) .qq-pick-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 6px;
+}
+.view:has(.msgs) .qq-pick-count {
+  font-size: 12px;
+  color: #7C8494;
+}
+.view:has(.msgs) .qq-pick-count.is-on { color: #0B87D6; font-weight: 600; }
+.view:has(.msgs) .qq-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 236px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #E6EAF1;
+  border-radius: 8px;
+  background: #FFFFFF;
+}
+.view:has(.msgs) .qq-pick {
+  display: grid;
+  grid-template-columns: 22px 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #20242B;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.view:has(.msgs) .qq-pick:hover { background: #F5F8FC; }
+.view:has(.msgs) .qq-pick.is-on { background: #EAF7FF; }
+/* 圆形选择圈：没选=灰边空心；选=蓝底白勾（勾是用边框画的，不依赖字符，任何字体都显示得出来） */
+.view:has(.msgs) .qq-pick-radio {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #C3CAD6;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+.view:has(.msgs) .qq-pick.is-on .qq-pick-radio {
+  border-color: #12B7F5;
+  background: #12B7F5;
+}
+.view:has(.msgs) .qq-pick.is-on .qq-pick-radio::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 3px;
+  width: 5px;
+  height: 9px;
+  border: 2px solid #FFFFFF;
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(42deg);
+}
+/* 头像：有 QQ 号就用真图（xuh://avatar/），没有就留一个淡灰圆角块，不用人形剪影骗人 */
+.view:has(.msgs) .qq-pick-av {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: #E9EDF4 var(--pick-avatar, none) center/cover no-repeat;
+}
+.view:has(.msgs) .qq-pick-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.view:has(.msgs) .qq-pick-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.view:has(.msgs) .qq-pick-n {
+  font-size: 12px;
+  color: #6B7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view:has(.msgs) .qq-pick.is-bot .qq-pick-n { color: #0B87D6; }
+.view:has(.msgs) .qq-pick-t { font-size: 11px; color: #A6ACB8; flex: none; }
+.view:has(.msgs) .qq-pick-x {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #20242B;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 待修复清单里带的上下文（标错时多选的那些） */
+.view:has(.msgs) .issue-ctx {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-left: 2px solid #E6EAF1;
+  background: #F8FAFD;
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.view:has(.msgs) .issue-ctx-row { display: flex; gap: 6px; font-size: 11px; line-height: 1.5; color: #5B6270; }
+.view:has(.msgs) .issue-ctx-n { flex: none; color: #9AA1AE; }
+.view:has(.msgs) .issue-ctx-x { min-width: 0; }
+
+/* 窄窗口：会话栏挪到上方，气泡别顶满 */
+@media (max-width: 900px) {
+  .view:has(.msgs) .chat-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: auto;
+  }
+  .view:has(.msgs) .chat-convs { max-height: 190px; }
+  .view:has(.msgs) .msgs { height: auto; min-height: 0; padding: 12px 10px 32px; }
+  .view:has(.msgs) .msgs .msg .msg-x { max-width: 100%; }
+  .view:has(.msgs) .msgs .msg .msg-n { max-width: 130px; }
+}
+
+/* ===========================================================================
+ * 2026-11-08 追加（主人五项要求）
+ * =========================================================================== */
+
+/* ---------- 群头像 / 个人头像（主人：「现在还没有群头像」） ----------
+ * 取到真图（xuh://avatar/group/<群号> 或 xuh://avatar/<平台>/<号>）就把字徽标盖掉；
+ * 取不到时上面那条 .is-group / .is-qq 的渐变底照旧显示，不会留一个空方块。 */
+.view:has(.msgs) .conv-av[style*="--conv-avatar"] {
+  background: #EEF2F7 var(--conv-avatar) center / cover no-repeat;
+  color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(24, 32, 48, .08);
+}
+
+/* ---------- 会话栏的齿轮 + 静音标记（按会话单独设） ---------- */
+.view:has(.msgs) .conv-set {
+  flex: none;
+  margin-left: 2px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: #C3CAD6;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0;
+}
+.view:has(.msgs) .conv:hover .conv-set,
+.view:has(.msgs) .conv.is-on .conv-set { opacity: 1; }
+.view:has(.msgs) .conv-set:hover { color: #0B87D6; background: #EAF7FF; }
+.view:has(.msgs) .conv-mute {
+  margin-left: 5px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #F1F3F7;
+  color: #98A0AE;
+  font-size: 9.5px;
+  vertical-align: 1px;
+}
+.view:has(.msgs) .conv.is-muted .conv-name { color: #98A0AE; }
+
+/* ---------- 回复别人的具体某条（主人：「没有回复别人的具体某条」） ----------
+ * QQ 里被回复的那条贴在气泡顶上一条灰色引用，点一下跳到原文。 */
+.view:has(.msgs) .msgs .msg .msg-x .msg-quote {
+  display: block;
+  margin: 0 0 5px;
+  padding: 3px 8px;
+  border-left: 2px solid #D5DBE5;
+  border-radius: 0 5px 5px 0;
+  background: #F4F6FA;
+  color: #7C8494;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  cursor: pointer;
+}
+.view:has(.msgs) .msgs .msg .msg-x .msg-quote:hover { background: #ECF1F8; }
+.view:has(.msgs) .msgs .msg .msg-x .msg-quote b { color: #5B6270; font-weight: 600; }
+.view:has(.msgs) .msgs .msg.is-bot .msg-x .msg-quote {
+  border-left-color: rgba(255, 255, 255, .55);
+  background: rgba(255, 255, 255, .18);
+  color: #EAF8FF;
+}
+.view:has(.msgs) .msgs .msg.is-bot .msg-x .msg-quote b { color: #FFFFFF; }
+.view:has(.msgs) .msgs .msg.is-bot .msg-x .msg-quote:hover { background: rgba(255, 255, 255, .26); }
+
+/* ---------- 会话设置弹层里的开关 ---------- */
+.view:has(.msgs) .conv-sw {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 6px 0;
+  font-size: 12.5px;
+  color: #3A424F;
+  cursor: pointer;
+}
+.view:has(.msgs) .conv-sw input { width: 15px; height: 15px; margin: 0; }
+
+/* ===========================================================================
+   2026-11-16：两栏宽度可调整 + 会话头像接回
+   ---------------------------------------------------------------------------
+   --conv-w 由 app.js 的 chatSplitInit() 拖柄写入并存在 localStorage；
+   拖柄自己占第 2 列 6px，所以消息区仍是 minmax(0,1fr)。
+   .conv-av 以前只往 style 写 --conv-avatar，CSS 没引用 → 真头像一直没显示。
+   现在放真 <img>，加载失败由全局捕获移除，露出首字徽标（不空白）。
+   =========================================================================== */
+.view:has(.msgs) .chat-wrap {
+  grid-template-columns: var(--conv-w, 250px) 6px minmax(0, 1fr);
+  gap: 0 8px;
+}
+.view:has(.msgs) .conv-av { position: relative; overflow: hidden; }
+.view:has(.msgs) .conv-av__img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; border-radius: inherit;
+}
+
+/* 2026-11-16 二修：真头像取不到时不能只剩一个空灰方块。
+ * 多层 background：真图在**最上层**（盖住剪影），图加载失败则下面三层人形剪影照常显示。
+ * 白天/夜里各一份，夜里那份在 night.css 末尾。 */
+.view:has(.msgs) .msgs .msg.has-av::before {
+  background:
+    var(--msg-avatar) center / cover no-repeat,
+    radial-gradient(circle at 50% 32%, rgba(255,255,255,.95) 0 17%, transparent 18%),
+    radial-gradient(ellipse 46% 30% at 50% 92%, rgba(255,255,255,.92) 0 62%, transparent 63%),
+    linear-gradient(145deg, #B9CBE4, #8299BE);
+}
+.view:has(.msgs) .msgs .msg.is-bot::before {
+  background:
+    var(--bot-avatar) center / cover no-repeat,
+    radial-gradient(circle at 50% 32%, rgba(255,255,255,.95) 0 17%, transparent 18%),
+    radial-gradient(ellipse 46% 30% at 50% 92%, rgba(255,255,255,.92) 0 62%, transparent 63%),
+    linear-gradient(145deg, #FFB1CD, #E8608F);
+}

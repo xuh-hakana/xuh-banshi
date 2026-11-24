@@ -1,0 +1,76 @@
+{
+  "intent": {
+    "enabled": true,
+    "note": "派活判定（主人 2026-11-22 定稿）：@她 + 命中词表 + 好感≥whitelistFavor，三个同时满足才把这一轮交给 dsh-agent。不中词的 @ 不派。memory 类不做（xubot 已自动化）。词表可在面板「规矩手册」页直接增删，代码里不许内置第二份。",
+    "whitelistFavor": 100,
+    "agentTurnOnHit": true,
+    "selfMark": false,
+    "words": {
+      "search": [
+        "搜",
+        "搜索",
+        "搜一下",
+        "搜搜",
+        "查",
+        "查一下",
+        "查查",
+        "核实",
+        "真的吗",
+        "真假",
+        "真事",
+        "证据",
+        "评分",
+        "账号",
+        "媒体",
+        "链接",
+        "事实",
+        "证实",
+        "来源",
+        "抖音",
+        "视频里"
+      ],
+      "calc": [
+        "算",
+        "算一下",
+        "多少",
+        "几块",
+        "像素",
+        "宽",
+        "比例",
+        "差值",
+        "换算",
+        "等于"
+      ],
+      "negate": [
+        "别搜",
+        "不用搜",
+        "别查",
+        "不用查",
+        "开玩笑",
+        "删了你",
+        "改天",
+        "别算了",
+        "不用算"
+      ]
+    },
+    "agent": {
+      "mode": "acp",
+      "profile": "acp",
+      "cwd": ".",
+      "timeoutMs": 240000,
+      "maxChars": 120,
+      "preferModel": "flash",
+      "cooldownMs": 60000,
+      "failText": "这个我没查到，等回头查到了再跟你说"
+    },
+    "mode": {
+      "webOkWho": "free",
+      "webMissWho": "agent",
+      "dispatchPersona": false,
+      "dispatchFail": "code",
+      "chatPersona": true,
+      "chatFail": "code",
+      "webSources": true
+    }
+  }
+}

@@ -58,7 +58,7 @@ function fileFor(uid, platform) {
 }
 /* ===== 平台标识（2026-11-05：纯 B站用户也要能记）=====
  * 节标题两种写法，靠括号里有没有平台前缀区分：
- *   ## 名字（100000000）      老格式，没有前缀 = QQ（她手写的节全是这种，一个字不动）
+ *   ## 名字（1000000002）      老格式，没有前缀 = QQ（她手写的节全是这种，一个字不动）
  *   ## 名字（B站 30895294）    新格式，有前缀 = 那个平台（B站 UID 也是纯数字，没前缀会和 QQ 串号）
  * 平台名统一小写存：qq / bili；以后抖音、微博等按同样写法加，解析不用改。 */
 /* 平台表**不在这里另写一份**（2026-11-06）：统一用 people.js 那张注册表，
@@ -154,8 +154,8 @@ function personRange(lines, key) {
 }
 
 /* 解析两张表，一次解析出两个视图（同一份文本、同一套逻辑，不是另起一套）：
- *   all    = { 'qq:100000000': 节, 'bili:30895294': 节 } —— 按人物聚合用（parseAll）
- *   legacy = { '100000000': 节 } —— 只有 QQ 节、键是裸 QQ 号（parse，老调用方零改动） */
+ *   all    = { 'qq:1000000002': 节, 'bili:30895294': 节 } —— 按人物聚合用（parseAll）
+ *   legacy = { '1000000002': 节 } —— 只有 QQ 节、键是裸 QQ 号（parse，老调用方零改动） */
 function parseSections() {
   const all = {}, legacy = {};
   const md = readAll();
@@ -550,7 +550,7 @@ function add(uid, name, kind, text, conf, from) {
   if (!sec) return false;
 
   /* 主人判定用**来源账号的平台**，不用归一后的主账号平台：
-   * 把 bili:100000000 挂到主人名下时，main 会归一到 qq:100000000，
+   * 把 bili:1000000002 挂到主人名下时，main 会归一到 qq:1000000002，
    * 若拿 main.platform 去判，这个 B站 用户的话就会被写进人设层（和上面 fileFor 的口径矛盾）。
    * 来源是 B站/任意非 QQ 平台 → 一定不是主人，只写《人物喜好》。 */
   const srcPlat = (splitKey(uid) || { platform: 'qq' }).platform;

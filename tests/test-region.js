@@ -32,7 +32,7 @@ const t = (name, ok, why) => {
   // 临时地区表，绝不碰线上 data/people-region.json
   const tmp = path.join(os.tmpdir(), 'xuh-region-test-' + process.pid + '.json');
   fs.writeFileSync(tmp, JSON.stringify({
-    '100000000': '鞍山',     // 老数据：裸 QQ 号
+    '1000001000': '鞍山',     // 老数据：裸 QQ 号
   }), 'utf8');
   region._setFile(tmp);
 
@@ -87,7 +87,7 @@ const t = (name, ok, why) => {
   }
 
   // 老数据：裸 QQ 号仍读得到；一写就挪到人物键
-  const legacyUid = '100000000';
+  const legacyUid = '1000001000';
   t('老数据裸 QQ 键读得到', region.getRegion(legacyUid) === '鞍山', '得到 ' + region.getRegion(legacyUid));
   const mig = region.setRegion(legacyUid, '鞍山');
   t('老数据没变化不重写', mig.changed === false);
@@ -101,7 +101,7 @@ const t = (name, ok, why) => {
     t('存储/面板读到的仍是最细原文', region.getRegion(pid) === full,
       '得到 ' + region.getRegion(pid));
     const k = 'region_prompt_' + process.pid;
-    core.setTurn(k, { uid: accs[0], nick: multi.name || '测试', gid: '100000000', atMe: true, scope: '群100000000' });
+    core.setTurn(k, { uid: accs[0], nick: multi.name || '测试', gid: '1000001001', atMe: true, scope: '群1000001001' });
     const msgs = await core.buildMessages(k, '你好呀');
     const all = msgs.map(m => String(m.content || '')).join('\n');
     t('提示词里有市/区级那条', all.includes('## 眼前这个人所在地') && all.includes('\n西安市 未央区'),

@@ -104,7 +104,7 @@ function setRecaller(fn) { recaller = typeof fn === 'function' ? fn : null; }
 function extractAccounts(text) {
   const out = [];
   const src = String(text || '');
-  // 号后面可能直接跟中文、没有空格：「100000000叫皮皮」「123456说」——
+  // 号后面可能直接跟中文、没有空格：「2650321894叫皮皮」「123456说」——
   // 以前后瞻只认空白/标点，这种粘连写法整个号都对不上，指令层就回「没认出」（2026-11-19 主人实测踩到）。
   const re = /(?:^|[\s(（【\[，,:：])(?:@|qq|q号|q|bilibili|bili|号)?\s*([0-9]{5,12})(?=[)\）】\]\s:：，,。！？!?]|$|[\u4e00-\u9fa5])/gi;
   let m;
@@ -178,6 +178,22 @@ function normalizeTrigger(text) {
   return s;
 }
 
+/* 触发词动作的「真命令」判定（2026-11-25）：
+ * 只认 core.triggerCommand 真正支持的写法；认不出就返回空串，让上层判失败或放回聊天。
+ * 顺带吃掉模型自造的参数键（trigger / word / words / triggerWord）——
+ * semantic 会把 params 原样合并进 cmd，模型写什么键都有可能出现。 */
+function triggerCommandOf(cmd) {
+  const c = cmd || {};
+  const first = [c.command, c.trigger, c.word, c.words, c.triggerWord]
+    .map(x => S(x)).filter(Boolean)[0] || '';
+  if (!first) return '';
+  const s = normalizeTrigger(first);
+  if (/^(不用回复|适合回复|一定回复|必须回复|喊我|叫我|接话|固定话)[：:]\s*\S/.test(s)) return s;
+  if (/^(看)?(回复策略|触发词)$/.test(s)) return s;
+  if (/^删(触发词|不用回复|适合回复|一定回复)\s*\d+$/.test(s)) return s;
+  return '';
+}
+
 /* 一句话里要动的是谁：先按号（离关键词最近），没有再按名字找（唯一命中）。 */
 function resolveTarget(text, kwSrc) {
   const acc = accountNear(text, kwSrc);
@@ -229,14 +245,14 @@ function personByName(name) {
   return { pid: row.pid, platform: acc ? people.normPlat(acc.platform) : 'qq', id: acc ? String(acc.id) : '' };
 }
 
-/* AI 标记专用认人（2026-11-23 主人原话「ai账号100000000」）：
- * 通用 extractAccounts 要求号码前面是空白/标点/@/qq/号，而「账号100000000」的号紧贴在「账」后，
+/* AI 标记专用认人（2026-11-23 主人原话「ai账号4015881213」）：
+ * 通用 extractAccounts 要求号码前面是空白/标点/@/qq/号，而「账号4015881213」的号紧贴在「账」后，
  * 抠不出来；所以这里单独放宽——直接认「(ai|机器人)?账号 + 数字」和动作词后面的裸号，
  * 认不到再退回 personByName（按名字）。返回 { platform, id, pid } 或 null。
  * 只在 AI 标记的分支里用，不改通用认人，避免放宽后影响别的指令。 */
 function resolveAiTarget(text) {
   const src = String(text || '');
-  // 「ai账号100000000」「AI账号 100000000」「机器人账号123456」——号紧贴「账号」也能抠
+  // 「ai账号4015881213」「AI账号 4015881213」「机器人账号123456」——号紧贴「账号」也能抠
   const m = src.match(/(?:ai|机器人|robot)?\s*账号\s*[:：]?\s*([0-9]{5,12})/i)
     // 动作词 + 号：「标记123456」「改回123456」「取消123456」
     || src.match(/(?:标记|标成|标为|设为|设成|改回|恢复|取消|解除)\s*[:：]?\s*([0-9]{5,12})/)
@@ -251,7 +267,7 @@ function resolveAiTarget(text) {
 function extractCallName(text) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
 
-  // 问句不改名：「100000000 叫什么」「他叫啥」「这人叫什么名字」都是提问，
+  // 问句不改名：「592667172 叫什么」「他叫啥」「这人叫什么名字」都是提问，
   // 以前会把「什么」当成名字写进代称（2026-11-19 主人测出来的）。
   if (/(叫什么|叫啥|叫什么呢|叫什么名字|叫啥名|名字叫什么|是哪位|是谁)/.test(t)
     && !/(改成|改为|记成|记下来|以后就|以后叫|就叫)/.test(t)) return '';
@@ -291,7 +307,7 @@ function extractSelfName(text) {
  * 能归到某一项上的 → 落状态的人设层（按人挂，取代默认；同一个 who 只有一条，细节并进去越记越细）。
  * 一条装不下的那部分才落「约定」——约定是兜底（见 conv-state 的 PERSONA_CAP）。
  * 问句（你是谁 / 你是猫娘吗 / 你是不是…）、假设（如果你是…）、否定（你不是…）一律不动。 */
-const PERSONA_TOPICS = ['头发弯曲度', '发型', '发色', '发丝', '前发', '头发', '眼睛颜色', '眼睛', '体型', '性别', '本质', '身体颜色', '长相', '外貌', '性格', '身份'];
+const PERSONA_TOPICS = ['头发弯曲度', '发型', '发色', '发丝', '前发', '头发', '眼睛颜色', '眼睛', '体型', '性别', '本质', '身体颜色', '长相', '外貌', '性格', '身份', '名字', '姓名', '名称', '自称'];
 function extractPersona(text) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   if (!t) return null;
@@ -303,9 +319,11 @@ function extractPersona(text) {
   if (/(你不是|你不再是|你才不是|你不是要)/.test(t)) return null;
 
   // ① 单项：你的发型改成短发 / 眼睛变成蓝色 / 性格改成傲娇
-  const one = t.match(new RegExp('(?:虚幻|你)的?\\s*(' + PERSONA_TOPICS.join('|') + ')\\s*(?:改成|改为|换成|变成|成了|设为|设成|是|为)\\s*[「『"\']?([^，。！？、,!?；;：:"」』]{1,40})'));
+  const one = t.match(new RegExp('(?:虚幻|你)的?\\s*(' + PERSONA_TOPICS.join('|') + ')\\s*(?:改成|改为|改回|换成|换回|变成|成了|设为|设成|是|为|叫)\\s*[「『"\']?([^，。！？、,!?；;：:"」』]{1,40})'));
   if (one) {
     const v = S(one[2]).replace(/^(?:一(?:个|只|位|名|条)?)/, '').replace(/[吧啊呀哦呢了]+$/, '');
+    // 「名字改回默认 / 原来的」不是设定，交给 persona_reset 恢复默认
+    if (/^(?:默认|原来|原本|原来的|原本的|以前那个|以前)$/.test(v)) return null;
     if (v && !/^(?:什么|啥|谁|哪|多少)$/.test(v)) return { topic: S(one[1]), text: v };
   }
 
@@ -325,6 +343,9 @@ function extractPersona(text) {
 function extractPersonaReset(text) {
   const t = String(text || '').replace(/\s+/g, ' ').trim();
   if (/(约定|代称|状态)/.test(t) && /(恢复|还原|重置|取消|删掉|忘掉)/.test(t)) return '';
+  // 名字恢复默认（2026-11-25）：只认「恢复/还原/重置/删掉」和「改回默认/原来的」；「名字改回虚幻」是设定，不是恢复
+  if (/(名字|姓名|名称|自称)/.test(t) && /(恢复|还原|重置|取消|删掉|忘掉)/.test(t)) return '名字';
+  if (/(名字|姓名|名称|自称)/.test(t) && /改回(?:原来|原本|默认)/.test(t)) return '名字';
   if (/(人设|设定)/.test(t) && /(恢复|还原|重置|取消|删掉|忘掉)/.test(t)) return '人设';
   if (/(变回|恢复成?)(?:原来|原本|默认)(?:的)?(?:样子|人设|虚幻)/.test(t)) return '人设';
   return '';
@@ -474,7 +495,7 @@ function deterministic(text, ctx) {
   }
 
   // AI 账号标记 / 改回人物（2026-11-23 主人补做：只有自动判+面板按钮+引用解除，没有发话入口）。
-  // 认主人原话格式「ai账号100000000」和带动作词的说法。改回优先——「取消XX的AI标记」里也有「AI」。
+  // 认主人原话格式「ai账号4015881213」和带动作词的说法。改回优先——「取消XX的AI标记」里也有「AI」。
   // 管理类：由 handle/handleGroup 的 isOwner 挡住非主人，这里不判断权限。
   if (/(?:AI|ai|机器人|robot)\s*账号\s*[0-9]{5,12}/.test(t)
     || /(标记|标成|标为|设为|设成)\s*(?:[^，。！？、\s]{1,12})?\s*(?:为)?\s*(?:AI|ai|机器人)/.test(t)
@@ -522,7 +543,7 @@ function deterministic(text, ctx) {
   }
 
   // 「123456 叫 皮皮」——主人/面板说的这句 = 给这个号定名字（写**名字位**，面板第一列会变）。
-  // 以前一律写成代称，主人发「100000000叫皮皮」后看面板名字没变，就说「改不了」（2026-11-19）。
+  // 以前一律写成代称，主人发「2650321894叫皮皮」后看面板名字没变，就说「改不了」（2026-11-19）。
   // 举证式（证明/这句/转发/也/还）仍走下面的代称；别人说的也只是代称，不能改名字位。
   {
     const m = t.match(/(\d{5,12})\s*(?:就叫|就叫做|叫做|叫|喊|称呼为?)\s*[「『"']?([^\s，。！？、,!?；;：:"」』]{1,16})/);
@@ -798,6 +819,11 @@ async function semantic(text, ctx) {
       '代称举证用 alias_set + {platform,uid,name}；uid 必须是被叫的那个人的号。',
       '标注 AI 账号用 ai_mark + {platform,uid}（「ai账号123456」「把123456标记成AI」）；改回人物用 ai_unmark + {platform,uid}；uid 是那个号的数字。',
       '改人设用 persona_set + {topic,setting}：topic 是「人设」或「发型」「眼睛」这类单项，setting 是内容；恢复原样用 persona_reset。',
+      /* 2026-11-25 补参数契约：这一轮真因就是没写参数名，模型自造了 trigger 键 + 误判动作。 */
+      'params 只能放上面写明的键，不许自己造键名。',
+      '加/删触发词只能这么写：trigger_add|trigger_del + {command}，command 必须是「不用回复：X」「适合回复：X」「喊我：X」「固定话：词=话」「触发词」「删触发词 3」之一。',
+      '用户不是在说这类触发词指令，就不许用 trigger_add / trigger_del，改成 none。',
+      '拿不准是不是指令 → none，不要猜。',
     ].filter(Boolean).join('\n') },
     { role: 'user', content: String(text || '').slice(0, 2000) },
   ];
@@ -805,7 +831,11 @@ async function semantic(text, ctx) {
   try { out = S(await core.callLLM(prompt, { tag: 'nl-command', preferFallback: true })); } catch (e) { console.log('[指令] 语义解析失败：' + e.message); return null; }
   const j = pickJson(out);
   if (!j || !IDS.has(j.action) || j.action === 'none') return null;
-  return Object.assign({ text: String(text || '') }, j.params || {}, { action: j.action });
+  const cmd = Object.assign({ text: String(text || '') }, j.params || {}, { action: j.action });
+  // 触发词动作必须先过「真命令」判定：模型常把一句问句判成 trigger_add 却给不出合法命令。
+  // 判不过就当不是指令，绝不带着空命令往下执行（2026-11-25 假成功真因）。
+  if ((cmd.action === 'trigger_add' || cmd.action === 'trigger_del') && !triggerCommandOf(cmd)) return null;
+  return cmd;
 }
 
 /* 从模型输出里抠 JSON。以前用 /\{[\s\S]*?\}/（非贪婪）：碰到
@@ -1036,8 +1066,21 @@ async function execute(cmd, ctx, fullText) {
     }
     case 'trigger_add':
     case 'trigger_del': {
-      const out = S(core.triggerCommand(S(cmd.command || cmd.text)));
-      return { ok: true, reply: out || '触发词已处理。' };
+      /* 2026-11-25 真因修复：模型把「我怎么给你加上」当触发词，参数名还自造成 trigger；
+       * 老代码读 cmd.command||cmd.text → 拿整段原文 → core.triggerCommand 返回 null，
+       * 却靠 '触发词已处理。' 兜底并报 ok:true，什么都没做却回成功（主人实测）。
+       * 现在：命令必须是真正支持的那几种写法，否则直接失败，绝不假报成功。 */
+      const raw = triggerCommandOf(cmd);
+      if (!raw) {
+        return { ok: false, reply: '没认出要加/删什么触发词，我什么都没改。\n'
+          + diag(cmd.action, { 原文: S(cmd.text).slice(0, 40), 参数: Object.keys(cmd) }) };
+      }
+      const out = core.triggerCommand(raw);
+      if (!out) {
+        return { ok: false, reply: '这条触发词没处理成，我什么都没改。\n'
+          + diag(cmd.action, { command: raw.slice(0, 60) }) };
+      }
+      return { ok: true, reply: out };
     }
     case 'pause':
     case 'allow': {
@@ -1080,6 +1123,27 @@ async function execute(cmd, ctx, fullText) {
       const uid = S(cmd.uid || (ctx && ctx.uid));
       const byMaster = !!cmd.byMaster;
       if (!setting) return { ok: false, reply: '没听清要变成什么样，我什么都没改。' };
+
+      /* 名字（2026-11-25 主人令：「状态里可以直接把名字改成豆包」「主人是虚幻不变」）：
+       * 走人设层单槽（注入时最后单独压一节）；主人改写默认值（who=''），别人写的只挂他自己名下。
+       * 主人名字始终是默认名，不跟着这个名字走；回复里说清楚。 */
+      if (convState.isNameTopic(topic)) {
+        const nm = String(setting).replace(/^[\s「『"“']+|[\s」』"”']+$/g, '').trim();
+        if (!nm || nm.length > 16 || /[，。！？、,;；]/.test(nm)) {
+          return { ok: false, reply: '名字要 1~16 个字，不能带句号逗号。我什么都没改。' };
+        }
+        const who = byMaster ? '' : convState.personaWhoOf(uid);
+        if (!who && !byMaster) return { ok: false, reply: '没认出你是谁，我什么都没改。\n' + diag('persona_set', { uid, 原因: '没有可挂的 who' }) };
+        const r = convState.upsertPersona(who, topic, nm, S(ctx && ctx.nick) || (byMaster ? '主人' : '有人'));
+        if (!r || !r.ok) return { ok: false, reply: '名字没写进去：' + ((r && r.error) || '未知原因') };
+        const got = convState.nameOfTurn(byMaster ? [] : convState.whoListOf(uid));
+        if (!got || got.name !== nm) return { ok: false, reply: '写了但读回来对不上。\n' + diag('persona_set', { who, 期望: nm, 读回: got ? got.name : '(没有)' }) };
+        let defName = '虚幻';
+        try { defName = require('./config').cfgLive().botName || '虚幻'; } catch {}
+        return { ok: true, reply: byMaster
+          ? '默认名字改成「' + nm + '」了：所有人看到你都会自称' + nm + '；主人还叫「' + defName + '」，不变。'
+          : '记下了：你跟我说话的时候我叫「' + nm + '」。主人还是「' + defName + '」，别人也还是默认的。' };
+      }
 
       /* 主人说的 = 改默认值：单项（发型 / 眼睛…）直接改本体那几条全局状态，
        * 整体（你是一个猫娘）写全局人设；别人说的只挂他自己名下，绝不碰默认。 */
@@ -1126,7 +1190,21 @@ async function execute(cmd, ctx, fullText) {
       const topic = S(cmd.topic) === '人设' ? '' : S(cmd.topic);   // 空 = 整个恢复
       const who = byMaster ? '' : convState.personaWhoOf(uid);
       const r = convState.resetPersona(who, topic);
+      // 名字条还可能是普通状态（面板旧数据）：按主题一并删掉，恢复默认名
+      if (!topic || convState.isNameTopic(topic)) {
+        for (const tp of (topic ? [topic] : convState.NAME_TOPICS)) {
+          convState.delTopic(who, 'normal', tp);
+          convState.delTopic(who, 'local', tp);
+        }
+      }
       if (byMaster) convState.restoreBody(topic);                  // 单项恢复：本体那几条回默认值
+      if (convState.isNameTopic(topic)) {
+        let defName = '虚幻';
+        try { defName = require('./config').cfgLive().botName || '虚幻'; } catch {}
+        return { ok: true, reply: byMaster
+          ? '名字恢复默认了：又自称「' + defName + '」了；主人名字没动。'
+          : '你看到的我恢复成原来的名字了。' };
+      }
       return { ok: true, reply: byMaster
         ? ('默认人设已恢复：删了 ' + r.removed + ' 条，本体那几项也回默认了。')
         : ('你看到的我恢复成原来的虚幻了（删了 ' + r.removed + ' 条）。') };
@@ -1401,6 +1479,14 @@ async function handle(ctx) {
   try {
     cmd = deterministic(full, ctx);
     if (!cmd) cmd = await semantic(full, ctx);
+    /* 2026-11-25：根本不是指令时不吞消息。
+     * 真因：主人私聊一句「多个真相理论…如果你没有这个功能，我怎么给你加上」被语义层误判成
+     * trigger_add，指令层 handled:true 直接 return → 正常发言永远进不了聊天模型。
+     * 现在：面板（fromPanel）仍给一条回执；聊天侧返回 handled:false，让 qq.js 继续走正常聊天。 */
+    if (!cmd || cmd.action === 'none') {
+      if (ctx.fromPanel) return { handled: true, ok: false, action: 'none', reply: '没认出这是哪条指令，我什么都没改。' };
+      return { handled: false, reason: 'not-command' };
+    }
     // 走到这里的一定是主人（上面过了 isOwner）→ 人设改的是默认值
     if (cmd && (cmd.action === 'persona_set' || cmd.action === 'persona_reset')) cmd.byMaster = true;
     out = await execute(cmd || { action: 'none' }, ctx, full);
@@ -1420,7 +1506,7 @@ async function handleGroup(ctx) {
   ctx = ctx || {};
   // 2026-11-22：带图 / 引用 / 转发的消息不进群指令层。
   // 真因：主人发 B 站截图 → 视觉描述里含「B站」「一开始」→ 被 matchSwitch 当成
-  // 「打开 bilibili」，群里回「bilibili 已打开。」（群100000000、100000000 实测）。
+  // 「打开 bilibili」，群里回「bilibili 已打开。」（群858455686、894917172 实测）。
   // 图片描述不是用户说的话，引用/转发同理，一律不解析。
   if (ctx.hasImg || ctx.quoted) return { handled: false, reason: 'img-or-quote' };
   const platform = S(ctx.platform) || 'qq';
@@ -1537,6 +1623,6 @@ async function handleRecord(ctx) {
 module.exports = {
   handle, handleGroup, handleRecord, handleCorrection, isOwner, deterministic, semantic,
   catalog: () => ACTIONS.slice(), extractAccounts, extractCallName, extractRenameName,
-  personByName, normalizeTrigger, diag, errBrief, setRecaller,
+  personByName, normalizeTrigger, triggerCommandOf, _execute: execute, diag, errBrief, setRecaller,
   extractSelfName, extractPersona, extractPersonaReset,
 };

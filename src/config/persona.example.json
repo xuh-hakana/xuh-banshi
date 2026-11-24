@@ -1,0 +1,40 @@
+{
+  "botName": "虚幻",
+  "city": "上海",
+  "noRegionReply": "可是我不知道你住在哪里QAQ...告诉我在哪个城市好不好",
+  "lookupProfileRegion": true,
+  "diaryTime": "00:05",
+  "guideSave": {
+    "skipPerishable": true
+  },
+  "files": {
+    "soul": "soul/F-全场景通用主人设/虚幻.md",
+    "extra": "",
+    "memory": "data/人物列表.md"
+  },
+  "panel": {
+    "order": [
+      "soul/F-全场景通用主人设/0-我的喜好.md",
+      "soul/F-全场景通用主人设/虚幻.md",
+      "soul/F-全场景通用主人设/1-性格.md",
+      "soul/F-全场景通用主人设/2-说话.md",
+      "soul/F-全场景通用主人设/功能词典.md",
+      "soul/H-全聊天/3-应对.md",
+      "soul/H-全聊天/应对/我-被夸.md",
+      "soul/H-全聊天/应对/我-被怪.md",
+      "soul/H-全聊天/应对/别人-被围观.md",
+      "soul/H-全聊天/应对/被提问-被需要.md",
+      "soul/H-全聊天/应对/被教会-学到了.md",
+      "data/说话风格.md",
+      "data/人物列表.md",
+      "data/网络热梗.md",
+      "data/人物喜好.md",
+      "data/guides/学到的.md",
+      "data/guides/洛克王国.md",
+      "data/guides/渔力全开.md",
+      "data/guides/速速上菜.md"
+    ],
+    "folders": [],
+    "folderOf": {}
+  }
+}

@@ -19,6 +19,7 @@ const http = require('http');
 const dns = require('dns');
 
 const ROOT = __dirname;
+const stickerPaths = require('./sticker-paths');   // 表情包根从配置解析（2026-11-25，不再写死 data/stickers）
 const configStore = require('./config');   // 配置统一入口：从 config/ 四个分区读取
 const G_ENV = '运行环境与依赖';
 const G_CFG = '配置与数据完整性';
@@ -57,7 +58,7 @@ function checkEnv() {
   try {
     const st = fs.statfsSync ? fs.statfsSync(ROOT) : null;
     if (st) {
-      const freeGB = (st.bavail * st.bsize) / 100000000;
+      const freeGB = (st.bavail * st.bsize) / 1073741824;
       out.push(it(G_ENV, '磁盘剩余', freeGB > 1, freeGB.toFixed(1) + ' GB',
         '只剩 ' + freeGB.toFixed(1) + ' GB，清一下日志/备份', freeGB > 1 ? undefined : 'warn'));
     }
@@ -69,10 +70,14 @@ function checkEnv() {
     const ok = fs.existsSync(path.join(ROOT, p));
     out.push(it(G_ENV, '关键文件 ' + p, ok, ok ? '在' : '不见了', '项目文件缺失，从备份恢复'));
   }
-  for (const d of ['data', 'connectors', 'soul', 'docs', 'data/stickers']) {
+  for (const d of ['data', 'connectors', 'soul', 'docs']) {
     const ok = fs.existsSync(path.join(ROOT, d));
     out.push(it(G_ENV, '目录 ' + d + '/', ok, ok ? '在' : '不见了', '建回来：缺目录会让所有写入静默失败'));
   }
+  // 表情包根：默认 src/data/stickers，可在配置 stickerDir 改（2026-11-25 主人定「不能写死路径」）
+  const sdRel = path.relative(ROOT, stickerPaths.stickerRoot()).split(path.sep).join('/');
+  const sdOk = fs.existsSync(stickerPaths.stickerRoot());
+  out.push(it(G_ENV, '目录 ' + sdRel + '/（表情包）', sdOk, sdOk ? '在' : '不见了', '建回来：缺目录会让所有表情包写入静默失败'));
   return out;
 }
 
@@ -116,7 +121,7 @@ function checkConfig() {
 
   // 所有数据文件能解析（解析坏了 = 相关功能静默失效，不报错只是不干活）
   let jsonBad = [], jsonlBad = [];
-  const dirs = ['data', 'data/stickers', 'soul'];
+  const dirs = ['data', path.relative(ROOT, stickerPaths.stickerRoot()), 'soul'];
   for (const d of dirs) {
     for (const f of listFiles(d, ['.json'])) {
       const rel = d + '/' + f;
@@ -146,7 +151,7 @@ function checkConfig() {
     ['data/网络热梗.md', 20, '自有梗库', '接梗靠它，恢复备份'],
     ['data/梗词典.jsonl', 10000, '梗词典', '自由搭话的关键词闸靠它，恢复备份'],
     ['data/笑点解析范例.md', 50, '笑点解析范例', '笑点解析质量会掉'],
-    ['data/stickers/常用.md', 20, '常用表情单', '她一张表情都发不出'],
+    [path.relative(ROOT, stickerPaths.stickerRoot()) + '/常用.md', 20, '常用表情单', '她一张表情都发不出'],
   ]) {
     let size = -1;
     try { size = fs.statSync(path.join(ROOT, p)).size; } catch { }
@@ -180,7 +185,7 @@ function checkConfig() {
     const nd = rec.needDesc || [];
     out.push(it(G_CFG, '表情表 ↔ 图片', (rec.classified || 0) > 0,
       '表里 ' + (rec.classified || 0) + ' 张图对得上、纯描述 ' + (rec.pureDesc || 0) + ' 条（没图但留着的描述，正常，不删）',
-      '一行「- 描述：图名1、图名2」，图名要和 data/stickers/ 里的文件名一致'));
+      '一行「- 描述：图名1、图名2」，图名要和 ' + stickerPaths.relSticker() + '/ 里的文件名一致'));
     if (nd.length) {
       out.push(it(G_CFG, '缺描述的表情', false, nd.length + ' 张情绪图系统配不出描述（这算 bug）：' + nd.slice(0, 6).join('、'),
         '在「常用.md」补一行「- 什么时候用：图名」，图名写全；或把文件改个一眼能懂的名字', 'warn'));
@@ -340,9 +345,9 @@ async function checkCore(opts) {
     const conv = qq._atNameConvert ? qq._atNameConvert('主人是 ' + String(cfg.masterQQ || ''), { message_type: 'private', user_id: '1' }) : '';
     out.push(it(G_CORE, '输出安全', !!conv && !conv.includes('主人和主人'),
       conv.includes('主人和主人') ? '出现「主人和主人」' : '正常', '号码被错误替换，检查 atNameConvert'));
-    // 谎报闸（v91）：没做成的事不许说成做成了。真事 2026-10-23——主人让她加群 100000000，
-    // 她回「已成功加入群100000000」，实测没进群；NapCat 根本没有「按群号加群」这个动作。
-    const lieSample = '已成功加入群100000000，主人～';
+    // 谎报闸（v91）：没做成的事不许说成做成了。真事 2026-10-23——主人让她加群 1126843213，
+    // 她回「已成功加入群1126843213」，实测没进群；NapCat 根本没有「按群号加群」这个动作。
+    const lieSample = '已成功加入群1126843213，主人～';
     const gateOut = typeof qq._noFakeJoin === 'function' ? qq._noFakeJoin(lieSample) : lieSample;
     out.push(it(G_CORE, '谎报闸（加群）', typeof qq._noFakeJoin === 'function',
       typeof qq._noFakeJoin !== 'function' ? 'qq.js 里没有 noFakeJoin'

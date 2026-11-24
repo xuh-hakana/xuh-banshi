@@ -44,7 +44,7 @@ p._setDeps({
 });
 
 const inbox = (name, obj) => fs.writeFileSync(path.join(p.INBOX, name), JSON.stringify(obj), 'utf8');
-const base = { source: '100000000', at: 1, kind: 'mixed' };
+const base = { source: '1000001000', at: 1, kind: 'mixed' };
 const T0 = new Date('2026-11-23T10:05:00').getTime();
 
 (async () => {

@@ -42,7 +42,7 @@ const sqlFull = [
   'create table expression_patterns (id integer primary key, group_id text, situation text, expression text, weight real);',
   "insert into expression_patterns values (1,'111','我每天起来都有','是不是只要在群里发了就有',2.0);",
   "insert into expression_patterns values (2,'111','看这个','三十秒的小动画',1.8);",
-  "insert into expression_patterns values (3,'111','@乙(100000000) 你猜','猜不到吧',1.6);",
+  "insert into expression_patterns values (3,'111','@大肥鱼(1000001000) 你猜','猜不到吧',1.6);",
   "insert into expression_patterns values (4,'111','似的','似的',1.5);",
   "insert into expression_patterns values (5,'111','今天吃啥','火锅吧',1.2);",
   "insert into expression_patterns values (6,'111','下班了','快跑',1.0);",

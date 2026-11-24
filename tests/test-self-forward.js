@@ -37,14 +37,14 @@ function restore() {
 const qq = require(path.join(BASE, 'connectors', 'qq.js'));
 const core = require(path.join(BASE, 'core.js'));
 core.init(require(path.join(BASE, 'config')).load());
-qq._setSelf('100000000');
+qq._setSelf('1000001000');
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
   if (cond) { pass++; console.log('  ✓ ' + name); }
   else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); }
 }
-const ev = (o) => Object.assign({ post_type: 'message', message_type: 'group', user_id: '100000000' }, o || {});
+const ev = (o) => Object.assign({ post_type: 'message', message_type: 'group', user_id: '1000001000' }, o || {});
 
 (async () => {
   console.log('一、识别：只有本号发的群合并转发才算搬屎');
@@ -64,7 +64,7 @@ const ev = (o) => Object.assign({ post_type: 'message', message_type: 'group', u
   ok('不算她说过的话（复读检测跳过）', core._repeatHit(K, FORWARD) === '');
   ok('不算她说过的话（isRepeat 跳过）', core._isRepeat(K, FORWARD) === false);
 
-  core.setTurn(K, { source: 'qq', uid: '100000000', gid: 0, nick: '虚幻', isMaster: false });
+  core.setTurn(K, { source: 'qq', uid: '1000001000', gid: 0, nick: '虚幻', isMaster: false });
   const msgs = await core.buildMessages(K, '刚才那串是啥');
   const all = msgs.map(m => String(m.content || '')).join('\n');
   ok('普通上下文里能看到这条转发', all.indexOf('笑死我了') >= 0);
@@ -81,7 +81,7 @@ const ev = (o) => Object.assign({ post_type: 'message', message_type: 'group', u
 
   console.log('四、聊天记录只落流水，不进口语语料');
   const before = sizeOf(SPEECH);
-  core.logLine('qq', '', '测试搬屎转发不该进语料', true, '群100000000', { displayOnly: true });
+  core.logLine('qq', '', '测试搬屎转发不该进语料', true, '群1000001001', { displayOnly: true });
   ok('displayOnly 不写「她说过的话.jsonl」', sizeOf(SPEECH) === before);
 
   restore();

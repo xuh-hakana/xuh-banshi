@@ -33,7 +33,7 @@ const FAKE = [
 ].map(x => JSON.stringify(x)).join('\n') + '\n';
 
 // 只拦 topics.jsonl，别的文件照常读
-const stat = { mtimeMs: 100000000, size: FAKE.length };
+const stat = { mtimeMs: 1000001000, size: FAKE.length };
 const origStat = fs.statSync.bind(fs);
 const origRead = fs.readFileSync.bind(fs);
 fs.statSync = function (p, ...a) {

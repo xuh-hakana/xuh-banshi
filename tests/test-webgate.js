@@ -24,7 +24,7 @@ function mulberry32(a) {
     a |= 0; a = a + 0x6D2B79F5 | 0;
     let x = Math.imul(a ^ a >>> 15, 1 | a);
     x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x;
-    return ((x ^ x >>> 14) >>> 0) / 100000000;
+    return ((x ^ x >>> 14) >>> 0) / 1000001000;
   };
 }
 
@@ -104,7 +104,7 @@ function mulberry32(a) {
     if (!s || s.length > cap) allOk = false;
     seen.add(s);
     if (s.indexOf('你别的号') < 0) mustOk = false;
-    if (s.indexOf('b23.tv/6cKFSj2') < 0 || s.indexOf('100000000') >= 0) accOk = false;
+    if (s.indexOf('b23.tv/6cKFSj2') < 0 || s.indexOf('1000001001') >= 0) accOk = false;
     if (s.indexOf('/收图') >= 0 || s.indexOf('提醒活动身体') >= 0) exclOk = false;
   }
   t('随机 300 次都不空且 ≤ cap-10（' + cap + '）', allOk, '长度超了或为空');
@@ -119,7 +119,7 @@ function mulberry32(a) {
   t('QQ 独有全列两次一致', qqEx === core._capabilityExclusive('qq'), '不确定');
   t('QQ 独有含保健提醒、不含 /收图', qqEx.indexOf('提醒活动身体') >= 0 && qqEx.indexOf('/收图') < 0, qqEx);
   t('B站 独有含 /收图、不含保健提醒', biEx.indexOf('/收图') >= 0 && biEx.indexOf('提醒活动身体') < 0, biEx);
-  t('B站 版其他账号只给 QQ 号', biEx.length > 0 && core._capabilityText('bili', mulberry32(7)).indexOf('100000000') >= 0, '没给 QQ 号');
+  t('B站 版其他账号只给 QQ 号', biEx.length > 0 && core._capabilityText('bili', mulberry32(7)).indexOf('1000001001') >= 0, '没给 QQ 号');
 
   // ===== ④ 平台问法识别 =====
   const platCases = [

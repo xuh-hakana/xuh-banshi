@@ -28,7 +28,7 @@ qq._setCfg(cfg);
     return { ok: true };
   };
 
-  const master = String(cfg.masterQQ || '100000000');
+  const master = String(cfg.masterQQ || '1000000002');
   // 真实结构的私聊消息事件（OneBot 11 / NapCat 字段）
   const ev = {
     time: Math.floor(Date.now() / 1000),
@@ -37,7 +37,7 @@ qq._setCfg(cfg);
     message_type: 'private',
     sub_type: 'friend',
     user_id: master,
-    message_id: 100000000,
+    message_id: 990000001,
     message: [{ type: 'text', data: { text: '在吗' } }],
     raw_message: '在吗',
     sender: { user_id: master, nickname: '主人', sex: 'female', age: 0 },

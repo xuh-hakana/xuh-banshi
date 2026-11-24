@@ -29,8 +29,8 @@ function ok(name, cond, extra) {
   else { fail++; console.log('  ✗ ' + name + (extra ? '  → ' + extra : '')); }
 }
 
-const ME = '100000000';
-const GID = 100000000;
+const ME = '1000001000';
+const GID = 1000001001;
 qq._setSelf(ME);
 
 const ban = (duration, sub, uid = ME, gid = GID) => ({

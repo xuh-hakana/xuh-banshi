@@ -15,6 +15,7 @@ const configStore = require('./config');   // 配置统一入口：从 config/ �
 const astrbotLlm = require('./llm-astrbot.js');   // AstrBot 接入：Key 在 AstrBot 配置里，llm.json 可为空
 
 const ROOT = path.join(__dirname);
+const stickerPaths = require('./sticker-paths');   // 表情包根可配置（2026-11-25）
 const HOLD_MS = 10 * 60 * 1000;          // 问题持续 10 分钟才提醒
 const REMIND_EVERY = 60 * 60 * 1000;     // 还没修好的话，每小时提一次
 const STATE_PATH = path.join(ROOT, 'data', 'selfwatch-state.json');   // 当前没解决的问题（面板读）
@@ -110,7 +111,8 @@ function probeAll() {
     if (!fileOk(f, 20)) bad.push(['人设', f + ' 不见了或被清空——这个场合的应对规矩全丢（从备份补回来）']);
   }
   if (!fileOk('data/笑点解析范例.md', 50)) bad.push(['笑点解析', '笑点解析范例丢了或被清空，笑点解析质量会掉']);
-  if (!fileOk('data/stickers/常用.md', 20)) bad.push(['表情包', '场合表 data/stickers/常用.md 丢了，她一张表情都发不出']);
+  const _sdRel = path.relative(ROOT, stickerPaths.stickerRoot()).split(path.sep).join('/');
+  if (!fileOk(_sdRel + '/常用.md', 20)) bad.push(['表情包', '场合表 ' + stickerPaths.relSticker() + '/常用.md 丢了，她一张表情都发不出']);
   if (!fileOk('data/网络热梗.md', 20)) bad.push(['热梗', '自有梗库 data/网络热梗.md 丢了']);
   if (!fileOk('data/梗词典.jsonl', 10000)) bad.push(['梗词典', '梗词典 data/梗词典.jsonl 丢了（自由搭话的关键词闸靠它）']);
 

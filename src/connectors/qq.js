@@ -28,6 +28,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const core = require('../core');
+const anchor = require('../anchor');   // 2026-11-25：本轮锚定（启动闸 / 出口闸 / 历史时间锚）
 const imgCache = require('../img-cache');   // 同一张图只 base64 一次（发送/识图共用）
 const { boundedMap } = require('../bounded-map');   // 缓存加界：超过上限淘汰最老的，读法不变
 const fileCache = require('../file-cache');       // 表文件按 mtime 缓存，不每条消息重新 parse
@@ -677,15 +678,19 @@ async function lookupRegion(ctx) {
   return '';
 }
 
-// 表情包：data/stickers/ 里的图片，模型用 [表情:名字] 触发
-const STICKER_DIR = path.join(__dirname, '..', 'data', 'stickers');
+// 表情包：<表情包根>/ 里的图片，模型用 [表情:名字] 触发。
+// 2026-11-25 主人定「不能写死路径」：根目录从配置解析（sticker-paths.js），默认 src/data/stickers。
+const stickerPaths = require(path.join(__dirname, '..', 'sticker-paths.js'));
+const stickerFilter = require(path.join(__dirname, '..', 'sticker-filter.js'));
+const blockedStore = require(path.join(__dirname, '..', 'blocked-store.js'));
+let STICKER_DIR = stickerPaths.stickerRoot();
 // ===== 表情包自动收集（主人 2026-10-22）：群聊里的表情包自动收进 data/stickers/，她按需发 =====
 // 规则：只收非测试群的图；md5 + 像素指纹去重；不收张数限制，只受已收图总量 50GB 封顶（2026-11-17 改）。
 // 2026-11-03 主人纠正两条：
 //   ① 300KB 上限是错的 —— 群里很多表情包就有 3MB，那样等于把大半的图挡在门外。改成 8MB（识图已放开见 :2087，收图大图单独存见 :883）。
 //   ② 「别人一天最多 20 张」这条从来不是她的规矩 —— 删掉。500 张上限 2026-11-17 也取消，改总量 50GB。
 // 名字用视觉翻译的开头（有语义她才挑得出来「哪张配哪句话」），重名自动加序号。
-const STICKER_MD5 = path.join(STICKER_DIR, '.md5.json');
+let STICKER_MD5 = path.join(STICKER_DIR, '.md5.json');
 const stickerSeen = new Set();          // 本次进程内已见过的 md5
 const STICKER_MAX_BYTES = 8 * 1024 * 1024;   // 收图体积上限（2026-11-03：原 300KB 太窄）
 function stickerMd5Load() {
@@ -695,46 +700,82 @@ function stickerMd5Save(o) {
   try { fs.mkdirSync(STICKER_DIR, { recursive: true }); fs.writeFileSync(STICKER_MD5, JSON.stringify(o), 'utf8'); } catch {}
 }
 // 清理名字：只留中文/字母/数字/常用符号，去掉路径非法字符
-const STICKER_COMMON = path.join(STICKER_DIR, '常用');   // 主人认为好用的固定几个（一直留着，2026-10-22 定）
+let STICKER_COMMON = path.join(STICKER_DIR, '常用');   // 主人认为好用的固定几个（一直留着，2026-10-22 定）
 // 场合表放表情包**根目录**（2026-10-31 主人定：「总之表情包功能都放这里」）。
 // 以前在 常用/常用.md 里，现在和 普通-场合.json、.md5.json 并排，一眼看得全。
-const STICKER_COMMON_MD = path.join(STICKER_DIR, '常用.md');
+let STICKER_COMMON_MD = path.join(STICKER_DIR, '常用.md');
 // ===== 表情池（主人 2026-10-30 定，2026-11-08 改口径）=====
 // 常用/ 和 虚幻/ 同级：同属 main（权重 48），同名图两张都进候选一起抽，没有先后。
 // 常用/ = 她手挑的；虚幻/ = 虚幻形象的表情包（5 张），发哪张由 常用.md 的场合行决定。
 // 可用/ → usable（6）；关键词触发/ → kw（8）；少用/ 和根目录 q 图 → normal（1）。
-const STICKER_USABLE = path.join(STICKER_DIR, '可用');
-const STICKER_SELF = path.join(STICKER_DIR, '虚幻');
+let STICKER_USABLE = path.join(STICKER_DIR, '可用');
+let STICKER_SELF = path.join(STICKER_DIR, '虚幻');
 // 关键词池（2026-11-02 主人定：「情绪图再加一个文件夹 关键词触发，承担关键词功能」）
 // 这个文件夹里的图 = 名字本身就是触发词，谁提到都能发，不等她有自己的情绪。
 // 它同时是**唯一**的关键词来源：根目录不带 q 的图不再算关键词类，直接无视。
-const STICKER_KW = path.join(STICKER_DIR, '关键词触发');
+let STICKER_KW = path.join(STICKER_DIR, '关键词触发');
 // 关键词的「额外说法」表（可空）：一行「- 打得过吗、胜率：奶龙论战很爽」。
 // 名字本身能命中的不用写，只有想多加几个说法的才写这里，所以这个文件通常只有几行。
-const STICKER_KW_MD = path.join(STICKER_KW, '关键词.md');
+let STICKER_KW_MD = path.join(STICKER_KW, '关键词.md');
 // 少用（2026-11-03 主人定）：原「收到」收件箱改名而来，主人不要「只存不发」的文件夹。
 // 它同时是 AstrBot 的临时图目录（~/.astrbot/data/temp 软链到这里），所以里面大部分是
 // media_image_时间戳.jpg。**池身份 = 普通池 normal，和根目录同一个池**（主人 2026-11-03 晚定：
 // 二存一、不并存）；只有「什么时候挑它」单独算一族，清单只写一行，不逐张列。
-const STICKER_LOW = path.join(STICKER_DIR, '少用');
+let STICKER_LOW = path.join(STICKER_DIR, '少用');
 // 难用（2026-11-16 主人补：曾经漏的功能）：情绪表情优先级梯度的最低一档
 // 常用 > 可用 > 少用 > 难用。按名字分 —— q 开头是情绪图，非 q 是关键词图；
 // 关键词图与这套优先级无关，放在哪档都能被一致触发，只有同级重叠才按优先级区分。
-const STICKER_HARD = path.join(STICKER_DIR, '难用');
+let STICKER_HARD = path.join(STICKER_DIR, '难用');
 // 大图（2026-11-16 主人定）：大于 8MB 的图从「跳过」改为单独收进这个文件夹，和难用同级。
-const STICKER_BIG = path.join(STICKER_DIR, '大图');
+let STICKER_BIG = path.join(STICKER_DIR, '大图');
+// 路径动态化（2026-11-25 主人定「我后续会手动移动位置」）：
+// 配置或环境变量改了目录，下一轮消息就切过去，不用重启；只在不一致时重算一次。
+let _spStamp = stickerPaths.stamp();
+function refreshStickerDirs() {
+  try {
+    const s = stickerPaths.stamp();
+    if (s === _spStamp) return false;
+    _spStamp = s;
+    STICKER_DIR = stickerPaths.stickerRoot();
+    STICKER_MD5 = path.join(STICKER_DIR, '.md5.json');
+    STICKER_COMMON = path.join(STICKER_DIR, '常用');
+    STICKER_COMMON_MD = path.join(STICKER_DIR, '常用.md');
+    STICKER_USABLE = path.join(STICKER_DIR, '可用');
+    STICKER_SELF = path.join(STICKER_DIR, '虚幻');
+    STICKER_KW = path.join(STICKER_DIR, '关键词触发');
+    STICKER_KW_MD = path.join(STICKER_KW, '关键词.md');
+    STICKER_LOW = path.join(STICKER_DIR, '少用');
+    STICKER_HARD = path.join(STICKER_DIR, '难用');
+    STICKER_BIG = path.join(STICKER_DIR, '大图');
+    _sfCache = []; _sfAt = 0;
+    _stbCache = 0; _stbAt = 0;
+    console.log('[表情] 路径已切换：' + STICKER_DIR + '（被拦图：' + stickerPaths.relBlocked() + '）');
+    return true;
+  } catch (e) { return false; }
+}
 // 2026-11-17 主人定：取消「每个文件夹 500 张」上限，改成已收图总量 50GB 封顶。
 // 下面的 dirImgCount / lowCount / kwCount 留作备用统计，不再用作收图闸门。
 const STICKER_TOTAL_MAX = 50 * 1024 * 1024 * 1024;   // 50GB = 50 * 1024^3 字节
 // 已收图总量（字节）：扫 stickers 下所有图片，含全部子目录（常用/可用/虚幻/关键词触发/少用/难用/大图/回收站）。
 // 按她「已收图的总量」字面 —— 回收站也算占空间。只数图片文件，非图片不计。
+let _stbCache = 0, _stbAt = 0;
+// 2026-11-23 主人定：省 CPU —— 总量统计要 walk 全库（1600+ 文件），原来每收一张图算两次。
+// 现在 60 秒内复用上一次的结果；收图封顶判断不吃毫秒级精度。
 function stickerTotalBytes() {
+  refreshStickerDirs();
+  const _nowB = Date.now();
+  if (_stbAt && _nowB - _stbAt < 60000) return _stbCache;
+  const v = _warmStickerBytes();
+  _stbCache = v; _stbAt = _nowB;
+  return v;
+}
+function _warmStickerBytes() {
   let total = 0;
   const walk = dir => {
     try {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
-        if (e.isDirectory()) walk(p);                       // 子目录递归
+        if (e.isDirectory()) { if (!stickerPaths.isUnderBlocked(p)) walk(p); continue; }   // 子目录递归（被拦图根不算表情包容量）
         else if (/\.(png|jpe?g|gif|webp)$/i.test(e.name)) {
           try { total += fs.statSync(p).size; } catch {}
         }
@@ -776,7 +817,13 @@ const VIS_EMO = [
 ];
 const QZONE_HIST_PATH = path.join(__dirname, '..', 'data', 'qzone-history.json');
 let stickerWishAt = 0;   // 上次提醒主人「缺表情」的时间（节流 10 分钟）
+let _sfCache = [], _sfAt = 0;
+// 2026-11-23 主人定：省 CPU —— 一次回话要扫 1~2 遍九个目录，1.5 秒内复用同一份列表（收图后最迟 1.5 秒可见）
+function stickerFilesInvalidate() { _sfAt = 0; }
 function stickerFiles() {
+  refreshStickerDirs();
+  const _sfNow = Date.now();
+  if (_sfAt && _sfNow - _sfAt < 1500) return _sfCache;
   let out = [];
   // 2026-11-02 主人定：**根目录只认 q 开头的情绪图，其余一律无视**。
   // 以前根目录什么都算（关键词图、群友收来的杂图、功能截图都在里面，还共用 2% 权重），
@@ -797,6 +844,7 @@ function stickerFiles() {
   sub(STICKER_LOW, '少用');
   sub(STICKER_HARD, '难用');       // 2026-11-16：情绪优先级最低档，进清单才发得出、搜得到
   sub(STICKER_BIG, '大图');        // 2026-11-16：大于 8MB 的图单独一档
+  _sfCache = out; _sfAt = Date.now();
   return out;
 }
 // 一个文件属于哪个池：main（常用+虚幻）/ usable（可用）/ kw（关键词触发）/ normal（根目录 q + 少用）/ hard（难用）/ big（大图）
@@ -976,6 +1024,58 @@ function pickFromCands(cands) {
 }
 // 「每个都是有场合能触发的」：场合单在 data/stickers/常用.md（一行「- 名字：场合」）。
 // 提示词只列有场合的；没进单子的不会发（等于不用），主人点名要删我再删。
+// 2026-11-23 主人定：主人发的情绪图直接进 常用/。
+// 从名字里取情绪词：q无语12 → 无语；取不到返回空串（取不到就不进常用，绝不写坏行）。
+function stickerEmoWord(name) {
+  const s = String(name || '');
+  if (!/^q/i.test(s)) return '';
+  let w = "";
+  for (const ch of s.slice(1)) {
+    const c = ch.codePointAt(0);
+    if (c >= 0x4e00 && c <= 0x9fa5) w += ch; else break;
+  }
+  return w.slice(0, 6);
+}
+
+// 常用.md 一行拆两半：- 描述：族名
+function stickerCommonLine(line) {
+  let s = String(line || '').trim();
+  if (s.charAt(0) === '-' || s.charAt(0) === '*') s = s.slice(1).trim();
+  let i = -1;
+  for (let k = 0; k < s.length; k++) { const c = s.charAt(k); if (c === ":" || c === "：") { i = k; break; } }
+  if (i < 0) return null;
+  const desc = s.slice(0, i).trim(), names = s.slice(i + 1).trim();
+  if (!desc || !names) return null;
+  return { desc: desc, names: names };
+}
+
+// 往 data/stickers/常用.md 追加「- 场合：图名」行：备份 → 按族名去重 → tmp+rename 原子写。
+// qq.js 与 server/panel.js 共用（面板「补描述」原来内联写表，改成调这个）。
+function appendCommonMd(lines) {
+  const NL = String.fromCharCode(10), WS = String.fromCharCode(13, 10, 32, 9);
+  const list = (Array.isArray(lines) ? lines : [lines]).map(x => String(x || "").trim()).filter(Boolean);
+  if (!list.length) return { ok: true, added: 0 };
+  try {
+    const cur = fs.existsSync(STICKER_COMMON_MD) ? fs.readFileSync(STICKER_COMMON_MD, 'utf8') : '';
+    const have = new Set();
+    for (const l of cur.split(NL)) { const px = stickerCommonLine(l); if (px) have.add(px.names); }
+    const fresh = list.filter(l => { const px = stickerCommonLine(l); return px && !have.has(px.names); });
+    if (!fresh.length) return { ok: true, added: 0 };
+    const d = new Date(), pad = n => String(n).padStart(2, '0');
+    const stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes());
+    try { fs.copyFileSync(STICKER_COMMON_MD, STICKER_COMMON_MD + '.备份-' + stamp); } catch {}
+    let body = cur;
+    while (body && WS.indexOf(body.charAt(body.length - 1)) >= 0) body = body.slice(0, -1);
+    const next = body + NL + fresh.join(NL) + NL;
+    const tmp = STICKER_COMMON_MD + '.tmp-' + process.pid;
+    fs.writeFileSync(tmp, next, 'utf8');
+    fs.renameSync(tmp, STICKER_COMMON_MD);
+    return { ok: true, added: fresh.length };
+  } catch (e) {
+    console.log('[表情] 写 常用.md 失败：' + e.message);
+    return { ok: false, added: 0, error: e.message };
+  }
+}
 function stickerOccasions() {
   const map = {};
   try {
@@ -1038,7 +1138,7 @@ function stickerRenamePass() {
 //   Windows     <home>\.workbuddy\binaries\python\envs\default\Scripts\python.exe
 //   macOS/Linux <home>/.workbuddy/binaries/python/envs/default/bin/python3
 // 本地虚拟环境还没建的话，回落到 PATH 里的 python / python3。
-// 原来的写法 'C:/Users/user/...' 在 Mac 上必然找不到，表情去重会静默失效（不报错，只是开始收重复表情）。
+// 原来的写法 'C:~/...' 在 Mac 上必然找不到，表情去重会静默失效（不报错，只是开始收重复表情）。
 function defaultPython() {
   const base = path.join(require('os').homedir(), '.workbuddy', 'binaries', 'python', 'envs', 'default');
   if (process.platform === 'win32') {
@@ -1052,33 +1152,33 @@ function defaultPython() {
 }
 // 感知哈希（主人 2026-10-22：同一张图 QQ 每次转存 md5 都不一样，像素不变——
 // 「开心.jpg」和「图中有一个蓝绿色头发」就是同图收了两次）。8x8 aHash，汉明距离 ≤5 判为同图。
-function stickerPHash(buf, mode) {
-  return new Promise(resolve => {
-    const tmp = path.join(require('os').tmpdir(), 'st_' + Date.now() + Math.random().toString(36).slice(2));
-    try { fs.writeFileSync(tmp, buf); } catch { return resolve(''); }
-    const py = (cfg && cfg.qzone && cfg.qzone.pythonPath) || defaultPython();
-    // mode: 空 = 8x8 aHash（收图去重的老口径，别动）；'d16' = 16x16 dHash（图库认图用）
-    const args = [path.join(__dirname, '..', 'scripts', 'sticker_hash.py'), tmp].concat(mode ? [mode] : []);
-    require('child_process').execFile(py, args, { timeout: 20000 }, (err, so) => {
-      try { fs.unlinkSync(tmp); } catch {}
-      try { const j = JSON.parse(String(so || '')); resolve(j.ok ? j.h : ''); } catch { resolve(''); }
-    });
-  });
+// 一次算完（2026-11-23 主人定）：收一张图原来是 kind + aHash + dHash16 三个脚本，
+// 现在同一个指纹只起 1 个（sticker_probe.py），口径完全不变，结果按 md5 记住。
+function stickerProbe(buf) {
+  return stickerFilter.probe(buf, { py: (cfg && cfg.qzone && cfg.qzone.pythonPath) || defaultPython() });
+}
+async function stickerPHash(buf, mode) {
+  const j = await stickerProbe(buf);
+  if (!j || !j.ok) return '';
+  return mode === 'd16' ? String(j.d16 || '') : String(j.a8 || '');
 }
 // 图片类型判定（2026-11-22 主人定：以后不收截图、插画，漫画只收简单的）。
 // 判在 src/scripts/sticker_kind.py：界面截图(OCR 多小字)/插画(量化色数≥110)/漫画整页(竖版白底分镜)。
 // 算不出来一律放过，不能因为判图把正常表情包挡了。
-function stickerKind(buf) {
-  return new Promise(resolve => {
-    const tmp = path.join(require('os').tmpdir(), 'sk_' + Date.now() + Math.random().toString(36).slice(2));
-    try { fs.writeFileSync(tmp, buf); } catch { return resolve({ ok: false }); }
-    const py = (cfg && cfg.qzone && cfg.qzone.pythonPath) || defaultPython();
-    const args = [path.join(__dirname, '..', 'scripts', 'sticker_kind.py'), tmp];
-    require('child_process').execFile(py, args, { timeout: 30000 }, (err, so) => {
-      try { fs.unlinkSync(tmp); } catch {}
-      try { const j = JSON.parse(String(so || '')); resolve(j && j.ok ? j : { ok: false }); } catch { resolve({ ok: false }); }
-    });
-  });
+const imgArchive = require(path.join(__dirname, "..", "img-archive.js"));
+const mediaIndex = require(path.join(__dirname, "..", "media-index.js"));
+const mediaCache = require(path.join(__dirname, "..", "media-cache.js"));
+const errLog = require(path.join(__dirname, "..", "err-log.js"));
+// 被拦图（2026-11-25 主人定）：收图闸判成截图/插画/复杂漫画页的图不丢，但**存到独立目录**，
+// 不再放进表情包目录；默认 src/data/blocked，可在配置 blockedDir 改，过 blockedKeepDays（默认 30）天自动清。
+// 它不属于任何表情包池：stickerFiles / 清单 / 发送权重 / 容量统计都不扫它。表情包永远不自动清。
+function stickerBlockSave(buf, kind, desc) {
+  return blockedStore.save(buf, kind, desc);
+}
+async function stickerKind(buf) {
+  const j = await stickerProbe(buf);
+  if (!j || !j.ok) return { ok: false };
+  return { ok: true, kind: j.kind, simple: j.simple, m: j.m || {} };
 }
 // 同步版，只给「启动对账补登记」用（stickerReconcile 是同步函数，等不了 Promise）。
 // 同一个 python 脚本、同一个默认口径（8x8 aHash），算不出来就返回空，绝不影响对账本身。
@@ -1254,20 +1354,24 @@ async function collectStickerBuf(got, opt) {
   if (!(cfg && cfg.stickerKindFilter === false)) {
     // 描述（识图）兜底：结构判断分不清的高清图，用模型描述里的关键词判（2026-11-22 主人定）
     const dtext = String(desc || '');
-    const whyDesc = /截图|聊天记录|评论区|论坛帖子|网页|界面|对话框|弹幕列表/.test(dtext)
-      ? 'screenshot'
-      : (/插画|立绘|原画|壁纸|海报|画作|绘画作品|艺术图|插图/.test(dtext) ? 'illustration' : '');
+    const whyDesc = stickerFilter.descBlockKind(dtext);
     if (whyDesc) {
-      console.log('[表情] 不收这张：' + whyDesc + '（描述：' + dtext.slice(0, 40) + '）');
-      return { ok: false, why: '不属于表情包（' + whyDesc + '）' };
+      const blk = stickerBlockSave(got.buf, whyDesc, dtext);
+      console.log('[表情] 不收这张：' + whyDesc + '（描述：' + dtext.slice(0, 40) + '）→ ' + (blk || '未存'));
+      return { ok: false, blocked: blk, why: '不属于表情包（' + whyDesc + '）' };
     }
-    kindInfo = await stickerKind(got.buf);
-    if (kindInfo && kindInfo.ok
-        && (kindInfo.kind === 'screenshot' || kindInfo.kind === 'illustration'
-            || (kindInfo.kind === 'manga_page' && !kindInfo.simple))) {
+    // 类型判一次就够：img-archive 按 16x16 指纹 + md5 记着，同一张图不再跑 python
+    let _archKind = '';
+    try {
+      const r = await imgArchive.identifyMany([got.buf], { python: (cfg && cfg.qzone && cfg.qzone.pythonPath) || defaultPython() });
+      _archKind = (r[0] && r[0].kind) || '';
+    } catch (e) {}
+    kindInfo = _archKind ? { ok: true, kind: _archKind, simple: true, m: {} } : await stickerKind(got.buf);
+    if (kindInfo && kindInfo.ok && stickerFilter.kindBlock(kindInfo.kind, kindInfo.simple)) {
       const mm = kindInfo.m || {};
-      console.log('[表情] 不收这张：' + kindInfo.kind + '（' + mm.colors + ' 色 / 白底 ' + mm.white + ' / 长宽 ' + mm.ratio + '）');
-      return { ok: false, why: '不属于表情包（' + kindInfo.kind + '）' };
+      const blk = stickerBlockSave(got.buf, kindInfo.kind, desc);
+      console.log('[表情] 不收这张：' + kindInfo.kind + '（' + mm.colors + ' 色 / 白底 ' + mm.white + ' / 长宽 ' + mm.ratio + '）→ ' + (blk || '未存'));
+      return { ok: false, blocked: blk, why: '不属于表情包（' + kindInfo.kind + '）' };
     }
   }
   const md5 = crypto.createHash('md5').update(got.buf).digest('hex');
@@ -1297,7 +1401,7 @@ async function collectStickerBuf(got, opt) {
         store[md5] = { f: oldRel, h: h || '', d: String(desc || '').slice(0, 600) };
         stickerMd5Save(store);
         console.log('[表情] 同一张图有更清楚的版本，已替换「' + oldRel + '」');
-        botWrite('data/stickers/', '表情包收集', '同一张图换了更清楚的版本，替换「' + oldRel + '」');
+        botWrite(stickerPaths.relSticker() + '/', '表情包收集', '同一张图换了更清楚的版本，替换「' + oldRel + '」');
         return { ok: true, rel: oldRel, why: '换了更清楚的版本' };
       } catch (e) { return { ok: false, why: '替换失败：' + e.message }; }
     }
@@ -1319,6 +1423,17 @@ async function collectStickerBuf(got, opt) {
   if (!dup && libHit) dup = libHit;          // 8x8 漂了，但 16x16 认出是同一张
   if (dup && !fs.existsSync(path.join(STICKER_DIR, dup))) dup = '';   // 索引里躺着已删的图
   if (dup) return finishDup(dup);
+  // 2026-11-23 懒读图：真新图收下来这一刻才补一次读图（定名字、防误收都要它，且只花这 1 次）
+  if (!String(desc || '').trim()) {
+    try { desc = await describeBuf(got.buf, mime); } catch (e) { try { errLog.logErr('collect', '收图补读失败', { msg: e.message }); } catch (e2) {} }
+    const dt2 = String(desc || '');
+    const why2 = stickerFilter.descBlockKind(dt2);
+    if (why2) {
+      const blk2 = stickerBlockSave(got.buf, why2, dt2);
+      console.log('[表情] 不收这张：' + why2 + '（描述兜底：' + dt2.slice(0, 40) + '）→ ' + (blk2 || '未存'));
+      return { ok: false, blocked: blk2, why: '不属于表情包（' + why2 + '）' };
+    }
+  }
   // 名字（2026-10-30 新格式）：情绪类 q<情绪><序号>，关键词类 <描述><序号>
   // 2026-11-02 主人定：**落到哪个文件夹按名字分**——q 开头的进根目录（情绪池），
   // 其余进 关键词触发/。以前非 q 的也扔根目录，可根目录现在只认 q，扔进去就永远发不出去了。
@@ -1330,11 +1445,16 @@ async function collectStickerBuf(got, opt) {
   // 现在：情绪图 → 可用/；其余 → 关键词触发/（和群友的图同一套按名字分）。
   // 2026-11-03 夜 主人定：**所有收图一律写 少用/**，根目录不再承担收发。
   // 根目录从此不写新图，只作为旧存量（q 情绪图）兼容读取；AstrBot 落盘本来就在 少用/。
-  const goUsable = pool === 'usable' && isEmoName;
-  const goKw = !goUsable && !isEmoName;
+  const emoWord = isEmoName ? stickerEmoWord(name) : '';
+  // 2026-11-23 主人定：主人自己发的情绪图（q 开头、取得到情绪词）直接进 常用/。
+  // 以前一律落 可用/，而 常用/ 只有人手放的图，主人发了也永远不进常用。
+  // 开关：config.stickerMasterToCommon === false 时回退到原来的 可用/。
+  const goCommon = pool === 'usable' && isEmoName && !!emoWord && !isBig && ((cfg || {}).stickerMasterToCommon !== false);
+  const goUsable = pool === 'usable' && isEmoName && !goCommon;
+  const goKw = !goCommon && !goUsable && !isEmoName;
   // 2026-11-16 主人定：大于 8MB 的图进「大图/」，和难用同级。
-  const dirName = isBig ? '大图' : (goUsable ? '可用' : goKw ? '关键词触发' : '少用');
-  const targetDir = isBig ? STICKER_BIG : (goUsable ? STICKER_USABLE : (goKw ? STICKER_KW : STICKER_LOW));
+  const dirName = isBig ? '大图' : (goCommon ? '常用' : (goUsable ? '可用' : goKw ? '关键词触发' : '少用'));
+  const targetDir = isBig ? STICKER_BIG : (goCommon ? STICKER_COMMON : (goUsable ? STICKER_USABLE : (goKw ? STICKER_KW : STICKER_LOW)));
   // 2026-11-17 主人定：取消各文件夹 500 张上限，改成已收图总量 50GB 封顶。
   // 落盘前再算一次总量（拉图前 collectSticker 也算过一次，这里防并发/绕过入口的 B站收图）：
   // 现有总量 + 这张的大小 > 50GB → 不收、提醒一次/天。
@@ -1353,10 +1473,26 @@ async function collectStickerBuf(got, opt) {
   stickerMd5Save(store);
   // 新图立刻补进图库指纹（增量只算这一张）；30 秒节流，连收好几张也只跑一次
   stickerLibRefresh();
-  console.log('[表情] 收了一张：' + rel + '（' + tag + '）' + (isBig ? '（大图，单独存）' : ''));
-  botWrite('data/stickers/' + dirName + '/', '表情包收集',
-    tag + '「' + name + '」' + (desc ? '（图上：' + String(desc).slice(0, 40) + '）' : ''));
-  return { ok: true, rel };
+  // 2026-11-23 主人定：进 常用/ 的图必须同时在 常用.md 登记一行，否则清单里查不到，等于白收。
+  // 登记失败就把图挪回 可用/，不留「有图无行」的半残状态。
+  let finalRel = rel;
+  if (goCommon) {
+    const reg = appendCommonMd(['- ' + emoWord + '：' + name]);
+    if (!reg.ok || !reg.added) {
+      try {
+        fs.mkdirSync(STICKER_USABLE, { recursive: true });
+        fs.renameSync(path.join(STICKER_COMMON, name + ext), path.join(STICKER_USABLE, name + ext));
+        finalRel = '可用/' + name + ext;
+        store[md5].f = finalRel;
+        stickerMd5Save(store);
+        botWrite(stickerPaths.relSticker() + '/可用/', '表情包收集', '登记常用失败，' + tag + '「' + name + '」改放 可用/');
+      } catch (e2) { console.log('[表情] 登记失败后挪图也失败：' + e2.message); }
+    }
+  }
+  console.log('[表情] 收了一张：' + finalRel + '（' + tag + '）' + (isBig ? '（大图，单独存）' : ''));
+  botWrite(stickerPaths.relSticker() + '/' + dirName + '/', '表情包收集',
+    (goCommon ? '主人发的表情（进常用）' : tag) + '「' + name + '」' + (desc ? '（图上：' + String(desc).slice(0, 40) + '）' : ''));
+  return { ok: true, rel: finalRel };
 }
 
 async function collectSticker(im, desc, ev) {
@@ -1378,8 +1514,17 @@ async function collectSticker(im, desc, ev) {
         if (r && r.data && /^https?:\/\//i.test(String(r.data.url || ''))) url = r.data.url;
       } catch {}
     }
-    if (!/^https?:\/\//i.test(url)) return;
-    const got = await core.getBinary(url);
+    /* 复用 describeImgs 刚下过的 buf（2026-11-24）：同一条消息里那张图不该再下一次。
+     * 客户端发来的图只有 localPath 没 url 时也走这里，用本地文件，不连网。 */
+    let got = null;
+    if (im && im.buf && im.buf.length) {
+      got = { buf: im.buf, type: im.mime || '' };
+    } else if (!/^https?:\/\//i.test(url) && im && im.localPath) {
+      try { got = { buf: fs.readFileSync(String(im.localPath)), type: '' }; } catch (e) { return; }
+    } else {
+      if (!/^https?:\/\//i.test(url)) return;
+      got = await core.getBinary(url);
+    }
     if (!got || !got.buf) return;
     // 2026-11-01：缓冲拿到手之后的事（去重 / 清晰度取大 / 命名 / 落盘）全交给 collectStickerBuf，
     // 这样 B站评论区收图能跟 QQ 收图共用同一套逻辑，不用复制两份。
@@ -1877,7 +2022,7 @@ function sendSticker(ev, name, allowOff) {
   const hit = stickerHit(name);
   if (!hit) return false;
   const abs = path.join(STICKER_DIR, hit).replace(/\\/g, '/');
-  // 2026-11-18 真机实测定案（测试群 100000000）：当前 NapCat 读不了本机 file:/// 路径，
+  // 2026-11-18 真机实测定案（测试群 1000000004）：当前 NapCat 读不了本机 file:/// 路径，
   // 一律 retcode 1200 EPERM（含 %20 转义、裸路径三种都失败）；base64:// 真机 ok 且图真进群。
   // 11-12 那次「修 file:///」只改了斜杠数量、没真机验，图其实一直发不出去——这次按真机结果改 base64。
   let imgFile;
@@ -2461,7 +2606,7 @@ function applyAtTiming(ans, ev, turnStart, opts) {   // 超时必@：5 秒内不
     return cut;
   }
   const aUid = String(ev.user_id), aGid = String(ev.group_id);
-  // 主人 2026-11-23 报：模型写了 @主人(100000000)，超时必@ 却在前面又叠一个 @当前说话人(Nana)，
+  // 主人 2026-11-23 报：模型写了 @主人(1000000002)，超时必@ 却在前面又叠一个 @当前说话人(Nana)，
   // 接着 atNameConvert 把 @主人当「@别人」抹成空格 → 群里只剩 @Nana「好的主人」= 认错人。
   // 修：模型已经写了**任意** @号（5~12 位 QQ），就当她自己指定了 @ 对象，不再叠加；
   // 状态仍按「是否 @ 了当前说话人」记，连回同一个人的去重口径不变。
@@ -2489,7 +2634,7 @@ function stripEchoJunk(s) {
 }
 
 // ===== 「没做成的事不许说成做成了」闸（v91，主人 2026-10-23 报的真事）=====
-// 私聊原文：「去加群100000000」→ 她回「已成功加入群100000000，主人～」，实测根本没进群。
+// 私聊原文：「去加群1126843213」→ 她回「已成功加入群1126843213，主人～」，实测根本没进群。
 // 查过：NapCat 的群相关接口一共 56 个，**没有「按群号搜索并加群」这个动作**；
 // 她只能「被别人邀请进群 / 被别人拉进去」时自动同意（见 onRequest）。主动加群这件事本身不存在。
 // 也就是说那句「已成功」是她自己编的——代码里没有任何返回值能让她以为成功了，这是谎报，不是能力问题。
@@ -2562,7 +2707,7 @@ function atNameConvert(ans, ev) {              // @ 当名字：@ 别人转成�
     return nm ? '@' + nm : ' ';
   });
   // 裸的 QQ 号**不再替换**（主人 2026-10-23 修，这是一处过度限制）：
-  // 旧代码 `out.split(号).join('主人')` 把「主人的QQ号是 100000000 和 100000000」
+  // 旧代码 `out.split(号).join('主人')` 把「主人的QQ号是 1000000002 和 3486543800」
   // 改成了「主人的QQ号就是主人和主人」——群友问号她答不出来，根子就在这一行。
   // 现在号原样保留；「没人问就别主动报」由提示词把关（人设优先，不做硬改）。
   return noFakeJoin(stripEchoJunk(out));
@@ -2818,9 +2963,36 @@ function recentVideoRef(chat, withinMs) {
 // 主人 2026-11-05 定顺序：先看图库里的哪一张，再「有字看字，无字看情绪」；命中图库就不再调视觉模型。
 // descs 与传入 imgs 按顺序对应（识别不了的给 ''）；lib 是对齐的图库相对路径（没命中 ''）。
 const TABLE_VISION_MODEL = '';   // 图上有表格/数字时换它重读：当前未配置任何视觉模型（xuhbot 不配模型），故关闭
-async function describeImgs(imgs) {
+// 把一串描述按顺序填回 [图片] 占位（图库/台账命中时只填得到的那几张，其余原样留着）
+function applyImgDescs(text, descs) {
+  if (!descs || !descs.some(Boolean)) return text;
+  let di = 0;
+  return String(text).replace(/\[图片\]/g, () => {
+    const d = descs[di++] || '';
+    return d ? '［图：' + d + '］' : '[图片]';
+  });
+}
+// 缓冲直接读图（收图补名字用）：落临时文件后复用 describeImgs 全套（图库认图/长图切块/表格重读）
+async function describeBuf(buf, mime) {
+  const m2 = String(mime || '');
+  const ext = m2.indexOf('png') >= 0 ? '.png' : (m2.indexOf('gif') >= 0 ? '.gif' : (m2.indexOf('webp') >= 0 ? '.webp' : '.jpg'));
+  const tmp = path.join(require('os').tmpdir(), 'db_' + Date.now() + Math.random().toString(36).slice(2) + ext);
+  try {
+    fs.writeFileSync(tmp, buf);
+    const r = await describeImgs([{ localPath: tmp }]);
+    return String(((r && r.descs && r.descs[0]) || '')).slice(0, 600);
+  } catch (e) {
+    try { errLog.logErr('describeBuf', '读图失败', { msg: e.message }); } catch (e2) {}
+    return '';
+  } finally { try { fs.unlinkSync(tmp); } catch {} }
+}
+async function describeImgs(imgs, opt) {
   const descs = [];
   const lib = [];
+  const LAZY = !!(opt && opt.lazy);      // 只记账不读图（收消息那一刻）
+  const UP = !!(opt && opt.upgrade);      // 回话前补读：复用已下载的 buf，读过的不再读
+  const slotKey = [];                     // descs 下标 → 图片 md5，读到了就写回台账
+  const markSlot = (slot, d) => { descs[slot] = d; try { if (slotKey[slot]) mediaIndex.markRead(slotKey[slot], d); } catch (e) {} };
   if (!imgs || !imgs.length) return { descs, lib };
   const uris = [];
   const slots = [];        // uris[i] 的描述填到 descs 的哪个坑
@@ -2828,6 +3000,20 @@ async function describeImgs(imgs) {
   const backfill = [];     // 图库命中但库里没 d 的：这次识完把 d 补回去（主人 2026-11-19）
   for (const im of imgs.slice(0, 3)) {
     lib.push('');          // 先占位：命中图库时改这一个，保证 lib 和 descs 严格对齐
+    /* 先于下载的去重（2026-11-24 主人定：图不要重复下载）：
+     * QQ url 里的 fileid 对同一张图稳定、rkey 会过期，所以拿 fileid 当 id；
+     * 命中缓存就直接出描述，0 次 HTTP、0 次视觉模型。 */
+    const _ckKey = mediaCache.keyOf(im);
+    let _ckM = '', _ckH = '', _ckRel = '';
+    const _ckHit = _ckKey ? mediaCache.lookup(_ckKey) : null;
+    if (_ckHit && _ckHit.d) {
+      try { if (_ckHit.m) im.mid = _ckHit.m; if (_ckHit.h) im.ih = _ckHit.h; } catch (e) {}
+      _ckM = _ckHit.m || ''; _ckH = _ckHit.h || ''; _ckRel = _ckHit.r || '';
+      lib[lib.length - 1] = _ckRel;
+      descs.push(_ckRel ? ('图库里的「' + stickerLibLabel(_ckRel) + '」（图上：' + _ckHit.d + '）') : _ckHit.d);
+      console.log('[img] 缓存命中，跳过下载：' + _ckKey);
+      continue;
+    }
     /* 本地文件（2026-11-23 客户端发送）：im.localPath 是客户端传上来的图，
      * 不走 QQ 图床、没有 http url，直接读盘。其余一切照旧（图库认图 / 视觉模型 / 长图切块）。 */
     const localPath = String((im && im.localPath) || '');
@@ -2838,10 +3024,12 @@ async function describeImgs(imgs) {
         if (r && r.data && /^https?:\/\//i.test(String(r.data.url || ''))) url = r.data.url;
       } catch {}
     }
-    if (!localPath && !/^https?:\/\//i.test(url)) { descs.push(''); continue; }
+    if (!localPath && !(UP && im && im.buf && im.buf.length) && !/^https?:\/\//i.test(url)) { descs.push(''); continue; }
     try {
       let got;
-      if (localPath) {
+      if (UP && im && im.buf && im.buf.length) {
+        got = { buf: im.buf, type: im.mime || '' };
+      } else if (localPath) {
         const ext = String(path.extname(localPath) || '').toLowerCase();
         const mime = ext === '.png' ? 'image/png' : (ext === '.jpg' || ext === '.jpeg') ? 'image/jpeg'
           : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : '';
@@ -2867,11 +3055,19 @@ async function describeImgs(imgs) {
       // 图库认图/视觉模型照常走；大图走视觉模型可能因体积上限报错，那种按正常失败填空，不阻断其它图。
       // 图库先认（2026-11-05 主人定）：先看她自己库里有没有这张，认出来就不用再看视觉模型。
       // 动图也在这儿认（PIL 直接读第一帧），认出来就不用再截帧。
+      // 台账里已经读过的文字（0 次模型）：先把 md5 和缓存描述备好
+      const _m5 = crypto.createHash('md5').update(got.buf).digest('hex');
+      try { im.mid = _m5; } catch {}
+      _ckM = _m5;
+      let _cacheDesc = '';
+      try { _cacheDesc = imgArchive.descOf(_m5) || ''; } catch {}
+      if (!_cacheDesc) { try { _cacheDesc = mediaIndex.descOf(_m5); } catch {} }
       try {
         const h = await stickerPHash(got.buf, 'd16');
         // 复读链用同一套规则：文字身份＝归一化文本，图身份＝像素指纹（QQ 转存 md5 每次都变，指纹才是同一张图）。
         // 挂回 im 供 onMessage 算统一的 echoKey；buf 是原图（gif 原 buf 发出来仍是动图）。
         try { im.ih = h || ''; im.buf = got.buf; im.mime = String(got.type || '').split(';')[0].toLowerCase(); } catch {}
+        _ckH = h || '';
         const hit = h ? stickerLibHit(h) : '';
         if (hit) {
           // 判图那段字按 md5 存在 .md5.json 的 d 里（主人 2026-11-19 定）：文件名只有 9 字上限，
@@ -2882,14 +3078,19 @@ async function describeImgs(imgs) {
             const rec = stickerMd5Load()[_md5];
             libDesc = String((rec && rec.d) || '').replace(/\s+/g, ' ').trim().slice(0, 600);
           } catch {}
+          // 归档里已经认过这张图和它的描述 → 直接复用，不再调视觉模型（2026-11-22）
+          if (!libDesc) { try { libDesc = imgArchive.descOf(_md5) || imgArchive.descOf(h) || mediaIndex.descOf(_md5); } catch (e) {} }
           // 例外：这次发的是同一张图但明显更清楚（大 15% 以上）→ 交给收图链路去替换库里的旧版
           // （2026-10-30 定的「同图取清晰度高的」不能因为「认出图库就跳过收图」被弄丢）
           let bigger = false;
           try { bigger = got.buf.length > fs.statSync(path.join(STICKER_DIR, hit)).size * 1.15; } catch {}
           lib[lib.length - 1] = bigger ? '' : hit;
+          if (!bigger) _ckRel = hit;
           if (libDesc) {
             descs.push('图库里的「' + stickerLibLabel(hit) + '」（图上：' + libDesc + '）');
             console.log('[img] 图库里认出来了：' + hit + (bigger ? '（这次更清楚，交给收图替换旧版）' : ''));
+            // 认出来了就落缓存：下次同一张图连下载都省
+            if (!bigger) { try { mediaCache.remember(_ckKey, { m: _ckM, h: _ckH, r: hit, d: libDesc, k: 'image' }); } catch (e3) {} }
             continue;
           }
           // 库里没 d（老图，或刚收还没识过）→ 不跳过，往下走一次视觉模型，识完回填 d。
@@ -2900,6 +3101,14 @@ async function describeImgs(imgs) {
         }
       } catch {}
       const mime = (got.type || 'image/png').split(';')[0].toLowerCase();
+      /* 2026-11-23 主人定：记录只记 id，需要读图/图进上下文时才让图跑一次模型。
+       * 台账里读过的直接复用文字；LAZY 时只把 id 记下来，这一轮不读。 */
+      if (_cacheDesc) {
+        descs.push(_cacheDesc);
+        try { mediaCache.remember(_ckKey, { m: _ckM, h: _ckH, d: _cacheDesc, k: 'image' }); } catch (e3) {}
+        continue;
+      }
+      if (LAZY) { descs.push(''); continue; }
       if (mime.indexOf('gif') >= 0) {
         const png = await core.gifToPng(got.buf);      // 动图先截一帧
         if (png) { uris.push(imgCache.dataUriFromB64(png, 'image/png')); slots.push(descs.length); descs.push(''); console.log('[img] 动图截了一帧'); }
@@ -2913,13 +3122,19 @@ async function describeImgs(imgs) {
       if (sz && sz.h > 2000) {
         longImgs.push({ slot: descs.length, buf: got.buf, mime });
         descs.push('');
+        slotKey[descs.length - 1] = _m5;
         console.log('[img] 长图 ' + sz.w + 'x' + sz.h + ' → 切块抄字');
         continue;
       }
       uris.push(imgCache.dataUriFromBuffer(got.buf, mime));
       slots.push(descs.length);
       descs.push('');
+      slotKey[descs.length - 1] = _m5;
     } catch (e) { console.log('[img] 下载失败：' + e.message); descs.push(''); }
+    /* 下载/识图完把 id→md5/指纹/描述/库路径 记回缓存，下次同一张图 0 次下载 */
+    try {
+      if (_ckKey && _ckM) mediaCache.remember(_ckKey, { m: _ckM, h: _ckH, r: _ckRel, d: String(descs[descs.length - 1] || ''), k: 'image' });
+    } catch (e2) {}
   }
   // 识图按类型读全（2026-11-19 主人给的判类型规则）：图有字有图案，只翻字不够，
   // 图案 / 软件界面 / 发言人头像 / 多人对话 / 复读都要判出来，主 AI 才有完整信息、才不会瞎编。
@@ -2959,7 +3174,7 @@ async function describeImgs(imgs) {
         }
         console.log('[img] 看到了：' + String(vision).slice(0, 100));
         if (uris.length === 1) {
-          descs[slots[0]] = flat(vision);
+          markSlot(slots[0], flat(vision));
         } else {
           // 多图：按「图N：」切段，每段的所有行都归它（新格式一段三行，按行拆会只剩第一行）
           const byN = {};
@@ -2970,20 +3185,20 @@ async function describeImgs(imgs) {
             if (n && body) byN[n] = body;
           }
           if (Object.keys(byN).length) {
-            slots.forEach((slot, i) => { if (byN[i + 1]) descs[slot] = flat(byN[i + 1]); });
+            slots.forEach((slot, i) => { if (byN[i + 1]) markSlot(slot, flat(byN[i + 1])); });
           } else {
             descs[slots[0]] = flat(vision);
           }
         }
       }
-    } catch (e) { console.log('[img] 识别失败：' + e.message); }
+    } catch (e) { console.log('[img] 识别失败：' + e.message); try { errLog.logErr('vision', '识图失败', { msg: e.message }); } catch (e2) {} }
   }
   // 长图：逐张切块抄字，抄到的字全量进描述（不截断）
   for (const L of longImgs) {
     try {
       const d = await core.seeImageLong(L.buf, L.mime, TEXT_ASK);
       if (d) {
-        descs[L.slot] = flat(d);
+        markSlot(L.slot, flat(d));
         console.log('[img] 长图描述 ' + String(d).length + ' 字');
       }
     } catch (e) { console.log('[img] 长图识别失败：' + e.message.slice(0, 80)); }
@@ -3014,6 +3229,18 @@ function takeImgDescs(text) {
   const descs = [];
   const t = String(text || '').replace(/［图：([^］]*)］/g, (m, d) => { descs.push(d); return '[图片]'; });
   return { text: t, descs };
+}
+
+/* 这一轮喂给模型的「对方说了什么」。
+ * 单条带图：维持「（对方发了图，图上：…）同时说：…」的旧格式。
+ * 合并轮（o.merged > 1）：**图留在原位**，不把所有图描述提到整轮最前——
+ *   否则后一条消息的图会挂到前一条文字上，后一条的配文变成裸行（2026-11-23 真事：
+ *   Oana「你去 at 下 subaru」+ 截图配文「你妈的」被拼成图在前、配文在后）。 */
+function turnPromptContent(o, imgDescs, cleanText, inlineText) {
+  const merged = Number(o && o.merged) || 0;
+  const inline = String(inlineText || '').trim();
+  if (merged > 1 && inline) return '（对方连着发了 ' + merged + ' 条，图留在原位）\n' + inline;
+  return '（对方发了图，图上：' + (imgDescs || []).join('；') + '）' + (cleanText ? ' 同时说：' + cleanText : '');
 }
 
 // 图里是不是「1、2、3… 并排的几个选项」（2026-11-03 主人定）。
@@ -3250,7 +3477,7 @@ function chainJoinAllowed(gid, text, ih) {
   const log = groupLog.get(gk) || groupLog.get(gkey) || [];
   const now = Date.now();
   // 主人 2026-10-22 傍晚定（推翻中午的方案）：**不复读 AI**——只有**人类**连着发的复读，
-  // 她分析后原样跟一条；别家 AI（乙，config.peerAI）发起/跟的链不算数，她自己也排除（无循环）
+  // 她分析后原样跟一条；别家 AI（大肥鱼，config.peerAI）发起/跟的链不算数，她自己也排除（无循环）
   const peerAI = (cfgLive().peerAI) || (cfg && cfg.peerAI) || [];
   const occ = log.filter(x => String(x.uid) !== String(selfId)
     && !x.bot && !peerAI.includes(String(x.uid))
@@ -3366,11 +3593,11 @@ function selfCheckReport(ev) {
 }
 
 // 学说话的门槛（主人 2026-10-22 重定，学习规则 v2）：
-//   只收**测试群（100000000）以外**的群聊发言；和 @ 无关（@ 后正常对话也收）；
+//   只收**测试群（1000000004）以外**的群聊发言；和 @ 无关（@ 后正常对话也收）；
 //   机器人功能指令（骰子、触发词）不收——那是在用功能，不是说话。私聊不收。
 function styleGate(ev, isMaster, isPrivate, text) {
   if (!isMaster || isPrivate) return false;
-  if (String(ev.group_id) === String(cfg.testGroup || 100000000)) return false;
+  if (String(ev.group_id) === String(cfg.testGroup || 1000000004)) return false;
   const t = String(text || '').trim();
   if (/^[.。]/.test(t)) return false;          // 骰子 / 指令
   if (/^（对方发了/.test(t)) return false;
@@ -3815,6 +4042,7 @@ function connect() {
   ws = new WebSocket(cfg.napcatWsUrl, opts);
   ws.on('open', () => {
     console.log('[QQ] 已连接 NapCat，上线'); setStatus(true, '已连接 NapCat');
+    try { require('../anchor').markConnected(); } catch (e) { /* 锚定模块坏了不影响上线 */ }
     // 上线就把图库指纹补齐/刷新一次（只算新图，全量 415 张约 3 秒），她发图才认得出是自己库里的
     try { stickerLibRefresh(true); } catch {}
     // 上线问一次群名单：聊天日志只存群号，会话栏要显示「群名（群号）」。
@@ -4579,7 +4807,7 @@ function greetOnii() {
     setTimeout(() => {                             // 等连接稳几秒再发
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       // 发送群跟保健提醒共用一处（features.json 的 healthRemind.groupId），换群只改那一处。
-      const gid = healthRemind.targetGroup() || cfg.testGroup || 100000000;
+      const gid = healthRemind.targetGroup() || cfg.testGroup || 1000000004;
       const body = '@' + (cfg.masterQQ || '') + '\n' + text;
       const segs = buildAtSegments(body);
       const r = sendAction('send_group_msg', { group_id: gid, message: segs || body });
@@ -4676,7 +4904,7 @@ const REPORT_PATH = path.join(__dirname, '..', 'data', 'onii-report.json');
 // 要扫的三个根（DSH 插件是 astrbot 插件目录里 persona_share 的软链，已在第二项覆盖，不重复扫）
 const REPORT_ROOTS = [
   { dir: path.join(__dirname, '..', '..'), label: '' },                    // xuhbot 工作区根
-  { dir: '/Users/zhengbowen/.astrbot/data/plugins', label: '插件' },       // AstrBot 插件（含 DSH 软链）
+  { dir: '~/.astrbot/data/plugins', label: '插件' },       // AstrBot 插件（含 DSH 软链）
 ];
 // 只认「当天真改过的源文件」：跳过备份/日志/缓存/运行时数据/依赖/测试快照/二进制，
 // 否则每天光是运行写的数据文件就把汇报刷满，反而看不出主人改了什么。
@@ -4744,7 +4972,7 @@ function reportOnii() {
       // 发到**测试群里** @ 欧尼酱（私聊他看不到她说了什么）
       // 她 2026-11-23：「把每日上线提醒也改到这个群」→ 跟保健提醒共用一个群号
       // （features.json 的 healthRemind.groupId），以后换群只改那一处。
-      const gid = healthRemind.targetGroup() || cfg.testGroup || 100000000;
+      const gid = healthRemind.targetGroup() || cfg.testGroup || 1000000004;
       const body = '@' + cfg.oniiQQ + ' ' + line;
       const segs = buildAtSegments(body);
       sendAction('send_group_msg', { group_id: gid, message: segs || body });
@@ -4821,6 +5049,7 @@ async function probeQzone(notify) {
 }
 
 async function onMessage(ev) {
+  refreshStickerDirs();          // 路径配置改了：下一轮消息就切过去（2026-11-25）
   const seg0 = parseSegments(ev);
   let { text, atMe, imgs, videos, atOthers, forwards } = seg0;
   /* 客户端发来的图/视频（2026-11-23 主人令「客户端能发图片视频文件」）：
@@ -4839,7 +5068,7 @@ async function onMessage(ev) {
   if (!text && !(imgs && imgs.length) && !(forwards && forwards.length)
     && !(replyId && isMasterUid(ev.user_id))) return;   // 主人引用消息发空格也放行：可能是「引用 AI 判定通知改回人物」
   rememberMsgId(ev, text);        // 撤回时靠 message_id 找回这句话
-  // 免记录群（config/features.json 的 noRecordGroups，默认赛博鱼塘 100000000）：
+  // 免记录群（config/features.json 的 noRecordGroups，默认赛博鱼塘 143620228）：
   // 主人 2026-11-07 定「鱼塘的人物以后都不要记录，只拿来看聊天效果」。
   // 这里提前算一次，好让下面「补昵称→号、比头像」这类人物信息也一起跳过；
   // 后面那处 noRec 复用同一个值，不再各自重算。
@@ -4920,24 +5149,27 @@ async function onMessage(ev) {
     : Promise.resolve('');
   // 图片先翻译再记录（主人 2026-10-22）：聊天记录、话题、给模型的上下文里都要有「图上是什么」。
   // 机器人群友的消息也会走到这里——无所谓，翻译了也只是记录，不接话（下面 isBotUser 挡着）。
+  let imgFilled = [];
   if (imgs && imgs.length && !mutedHere) {
     // 先把证据留下：图片到底有没有进来、NapCat 给的是 url 还是光一个 file（主人 2026-10-22 问「为什么还是看不见图」）
     console.log('[img] 收到图 ' + imgs.length + ' 张：'
       + imgs.map(x => String((x && (x.url || x.file)) || '(空)').slice(0, 70)).join(' | '));
     // 图库指纹可能缺新图（她刚丢进文件夹的）→ 后台增量补，不挡这一轮（这一轮认不出就走视觉模型）
     stickerLibRefresh();
-    const seen = await describeImgs(imgs);
+    // 2026-11-23 主人定：收消息只记账（id + 分类，0 次模型）；图进上下文时才读（见下面 upgrade）
+    const seen = await describeImgs(imgs, { lazy: true });
     const descs = seen.descs || [];
-    if (descs.some(Boolean)) {
-      let di = 0;
-      text = text.replace(/\[图片\]/g, () => {
-        const d = descs[di++] || '';
-        return d ? '［图：' + d + '］' : '[图片]';
-      });
-    }
+    imgFilled = descs.map(Boolean);
+    text = applyImgDescs(text, descs);
+    try {
+      mediaIndex.record(imgs.map(im => ({
+        id: (im && im.mid) || '', kind: 'image', hash: (im && im.ih) || '',
+        grp: ev && ev.group_id ? String(ev.group_id) : 'private',
+      })).filter(x => x.id));
+    } catch (e) { try { errLog.logErr('archive', '台账记不下来', { msg: e.message }); } catch (e2) {} }
     // 表情包自动收集（主人 2026-10-22）：小图后台收，不阻塞消息链；desc 对得上 imgs 顺序（slots 可能稀疏）
     // 命中图库的那张不用再收（本来就在库里，收了也只会被去重挡回来）
-    imgs.forEach((im, i) => { if (descs[i] && !seen.lib[i]) collectSticker(im, descs[i], ev).catch(() => {}); });
+    imgs.forEach((im, i) => { if (!seen.lib[i]) collectSticker(im, descs[i] || '', ev).catch((e) => { try { errLog.logErr('collect', '收图失败', { msg: e.message }); } catch (e2) {} }); });
   }
   /* 视频（主人 2026-11-22 定）：默认只看「字幕前 60 字 + 每 8 秒一帧、共 3 帧」。
    * 多段视频只翻第一个（一天发一串视频时全翻会把回话拖到几十秒）；其余保留 [视频] 占位。
@@ -5105,7 +5337,7 @@ async function onMessage(ev) {
   // 热度记录：被 @（含引用她）的时间戳——短时间高频 @ 时自主回复阈值降低（见 grpAutoTick）
   // （这里 isPrivate 还没声明，直接看消息类型）
   if (ev.message_type !== 'private' && atMe) recordAt(ev.group_id);
-  // 不记录群（机器人群，如赛博鱼塘②塘 100000000）：这些群只接话、不往任何数据文件里写东西。
+  // 不记录群（机器人群，如赛博鱼塘②塘 143620228）：这些群只接话、不往任何数据文件里写东西。
   // 聊天记录的拦截在 core.logLine 顶端统一做；认人 / 纠正 / 首见 / 学说话在这里拦（noRec 见上面）。
   const isPrivate = ev.message_type === 'private';
   const scope0 = isPrivate ? '私聊' : ('群' + ev.group_id);
@@ -5618,7 +5850,7 @@ async function handleTurn(ev, o) {
   }
   const k = core.histKey('qq', isPrivate ? ev.user_id : ev.group_id);
   const scope0 = isPrivate ? '私聊' : ('群' + ev.group_id);
-  // 不记录群（机器人群，如赛博鱼塘②塘 100000000）：本群只接话、不落盘。直接从群里号算，
+  // 不记录群（机器人群，如赛博鱼塘②塘 143620228）：本群只接话、不落盘。直接从群里号算，
   // 这样 onMessage / 合并后执行 / 拍一拍 三个入口都自动生效，不用每个调用方单独传。
   // 同上（主人 2026-11-13）：主人触发的那一轮，免记录群一律当正常群走完所有落盘。
   const noRec = !isPrivate
@@ -5638,6 +5870,15 @@ async function handleTurn(ev, o) {
   // 这条消息 @ 了别人（不是她）→ 说给别人听的，约定/记忆一个字都不录（主人 2026-10-23 定）
   const atOtherPerson = !!o.atOtherPerson;
   const isMaster = isMasterUid(ev.user_id);
+
+  /* 2026-11-25 启动/重连闸（本轮锚定）：进程刚起来或 NapCat 刚重连的那几分钟，
+   * 上下文里旧消息和积压消息混在一起，最容易把几小时前的图当成本轮的话。
+   * 这段时间只做被动回复（私聊 / @她 / 引用她 / 主人），不主动接话、不凑热闹。
+   * 只挡「要不要主动开口」，被动来的消息一条不丢。 */
+  if (anchor.inWarm() && !isPrivate && !atMeReal && !replyMe && !isMaster) {
+    console.log('[anchor] 刚启动/重连（剩 ' + anchor.warmLeftSec() + ' 秒）→ 这条不主动接：' + text.replace(/\s+/g, ' ').slice(0, 40));
+    return;
+  }
 
   /* 固定用法句落库（2026-11-21 冰冰冰失效事故的根因修复）：
    * 主人贴的梗百科长文里常夹一句「看到X时，直接发一句Y」——这是明确要照做的规则，
@@ -5688,7 +5929,7 @@ async function handleTurn(ev, o) {
     || (Number(ev.time) > 1e8 ? Number(ev.time) * 1000 : Date.now());
 
   // 暂停/允许命令**必须排在暂停闸前面**（主人 2026-10-23 报的真 bug：
-  // 他在群里喊「暂停100000000」→ 好，然后喊「允许100000000」→ 一句话都没有。
+  // 他在群里喊「暂停1000000004」→ 好，然后喊「允许1000000004」→ 一句话都没有。
   // 原因两层：① 命令只在私聊认，群里发根本进不到解析；② 被暂停的群先把消息吞了，永远轮不到「允许」。
   // 所以：主人的暂停命令**在哪儿发都认**，而且先处理、再判暂停。
   if (isMaster) {
@@ -5824,7 +6065,7 @@ async function handleTurn(ev, o) {
      * 本人说的排第一位：表里还没有任何称呼 → 直接当名字（name）；已经有了 → 插到代称最前。
      * 代称仍只有这一份，前端放到「约定·代称」分支展示；pactOf 的老规矩一个字不动。
      * 2026-11-19 修污染：群里一句
-     * 「叫它乙?这一叫我都觉得脸上有点挂不住喵」被老正则从腰上截出
+     * 「叫它大肥鱼?这一叫我都觉得脸上有点挂不住喵」被老正则从腰上截出
      * 「我都觉得脸上有点挂不住喵」当名字写进了 people.json。
      * 现在统一走 nick.callMeName（只认句首/停顿后的祈使句）+ looksLikeName，
      * 「这一叫我」「他叫我」这类从句子中间截出来的不再写。 */
@@ -6022,7 +6263,7 @@ async function handleTurn(ev, o) {
       }
       // 他 @ 的是别人（不是她），或者他在引用/回复别人的消息 → 那是他们在互相聊天，
       // 她不许回、不许插话（主人 2026-10-22：「群友@别人时，不要回复对方」；
-      // 「@100000000 蚁人在哪发财呢」她凑上去玩梗，还把人家的 @ 和昵称原样搬进回复——假 @ 就是这么来的）
+      // 「@3080513370 蚁人在哪发财呢」她凑上去玩梗，还把人家的 @ 和昵称原样搬进回复——假 @ 就是这么来的）
       // （主人 2026-10-23 补：这条只管群友——主人 @/引用别人时上面已接管，回那个人）
       else if (atOtherHit) {
         console.log('[skip] 他 @ 的是别人（真@或手打@昵称）/ 在跟别人聊，不自主接话：' + text.slice(0, 30));
@@ -6078,7 +6319,23 @@ async function handleTurn(ev, o) {
   // 群级节流：真的自主回了一句（白名单「适合回复」触发的不算）→ 重新攒（普通 15~20 条 / 热度 4~10 条）（主人 2026-10-22）
   // 主人的必回（回复率独立）不算自主发言，不重置群节流（主人 2026-10-23）
   if (!isPrivate && !atMe && !isMaster && (critic || banter || autoAsk || comment || topic || (chime && !pol.good))) grpAutoConsume(ev.group_id);
-  // 图片在 onMessage 就翻译好了（记录时就要有，见 describeImgs），这里把描述摘出来，不重复下载/识别
+  /* 图进上下文才读（2026-11-23 主人定）：收消息那一刻只记了 id，走到「真要回话」这一刻才让图跑一次模型。
+   * 台账/图库里有描述的 0 次调用；这次读到的写回台账，下次免读。禁言群不读（和白烧模型一个道理）。 */
+  if (imgs && imgs.length && !mutedHere && imgFilled.some(v => !v)) {
+    try {
+      const up = await describeImgs(imgs, { upgrade: true });
+      const d2 = up.descs || [];
+      let di = 0;
+      text = String(text).replace(/\[图片\]/g, () => {
+        while (di < d2.length && imgFilled[di]) di++;
+        const d = d2[di] || '';
+        di++;
+        return d ? '［图：' + d + '］' : '[图片]';
+      });
+      imgFilled = d2.map(Boolean);
+    } catch (e) { try { errLog.logErr('vision', '回话前读图失败', { msg: e.message }); } catch (e2) {} }
+  }
+  const inlineText = text;   // 合并轮用：保留 ［图：…］ 原位，不把图描述提到整轮最前
   const taken = takeImgDescs(text);
   text = taken.text;
   const imgDescs = taken.descs;
@@ -6133,7 +6390,7 @@ async function handleTurn(ev, o) {
   }
   let content;
   if (o.poke) content = '（' + who + '拍了拍你，不是说话）';
-  else if (imgDescs.length) content = '（对方发了图，图上：' + imgDescs.join('；') + '）' + (cleanText ? ' 同时说：' + cleanText : '');
+  else if (imgDescs.length) content = turnPromptContent(o, imgDescs, cleanText, inlineText);
   else if (cleanText) content = isPrivate ? cleanText : cleanText.replace(new RegExp(`@?${cfg.botName}\\s*`, 'g'), '').trim() || '在叫我?';
   else if (imgs && imgs.length) content = '（对方发了张图，但我没看清）';
   else return;
@@ -6535,7 +6792,9 @@ async function handleTurn(ev, o) {
     const _fav = (() => {
       try { const rec = people.getByAccount('qq', String(ev.user_id)); return Number((rec && rec.favor) || 0); } catch (e) { return 0; }
     })();
-    const _g = require('../intent-router').gate(cleanText || text, { atMe: atMeReal, favor: _fav });
+    // 2026-11-25：把私聊/主人身份也传进去——深度私聊（长思辨题）不 @ 也派给 dsh agent，
+    // 由子 agent 各自带人设分视角答；群聊照旧要真 @ + 好感满。
+    const _g = require('../intent-router').gate(cleanText || text, { atMe: atMeReal, favor: _fav, isPrivate, isMaster: isMasterMsg });
     _agentTurn = _g.action === 'work';
     if (_agentTurn) console.log('[派活] 命中（' + _g.reason + '，好感 ' + _fav + '）→ 这轮我出面');
   } catch (e) {
@@ -6585,6 +6844,16 @@ async function handleTurn(ev, o) {
       if (claimsDeleted(cleaned)) {
         console.log('[out] 幻觉删除宣言拦截（没人叫她删，真删除走指令层）：' + String(cleaned).slice(0, 50));
         return;
+      }
+      /* 2026-11-25 出口闸（本轮锚定）：非必回的一轮里，回复引用了**旧图**的内容
+       * （几小时前别人发的那张），说明她把旧图当成了这一轮 —— 宁可不说，不许说错。
+       * 必回（私聊 / @她 / 欢迎 / 主人）只记日志，不吞消息。 */
+      if (!isPrivate && !atMe && !welcomed && !isMaster) {
+        const _leak = anchor.imageLeak(cleaned, content, core.getHist(k));
+        if (_leak.leak) {
+          console.log('[anchor] 这一轮串了旧图（' + _leak.hit.join('、') + '）→ 不发送：' + String(cleaned).slice(0, 40));
+          return;
+        }
       }
       // 别人的约定不许套（主人 2026-10-23 报）：回张三时带着跟李四约的句尾记号（Ciallo 那事）→ 剥掉。
       // 模型照着历史里自己说过的话学样改不掉，发送层兜底，出口上删干净再发。
@@ -6721,6 +6990,9 @@ module.exports = { start, sendPrivate, injectClientMessage, _setCfg: c => { cfg 
   _healthSay: healthSay,   // 自测用：验「保健提醒这句话」到底能不能按人设生成出来
   _collectReportTitles: collectReportTitles,   // 自测用：保健提醒的「排次」和每日汇报同一份统计，要看数就调这个
   _stickerFiles: stickerFiles, _stickerHit: stickerHit, _stickerReconcile: stickerReconcile, _stickerOccasions: stickerOccasions,
+  _describeImgs: describeImgs, _collectSticker: collectSticker,
+  // 2026-11-23：主人发的表情进 常用/ 的两个口子（面板「补描述」也调 appendCommonMd 写表）
+  _appendCommonMd: appendCommonMd, _stickerEmoWord: stickerEmoWord,
   // 2026-11-01：收图公共口子（QQ + B站评论区共用同一套去重/清晰度/命名）
   _collectStickerBuf: collectStickerBuf, _collectSticker: collectSticker,
   _stickerGroups: stickerGroups, _stickerGroupOf: stickerGroupOf, _pickFromCands: pickFromCands,
@@ -6736,7 +7008,7 @@ module.exports = { start, sendPrivate, injectClientMessage, _setCfg: c => { cfg 
   _noFakeJoin: noFakeJoin, _setSelfJoinAt: v => { selfJoinAt = Number(v) || 0; },
   _isBotUser: isBotUser, _looksBotMessage: looksBotMessage, _detectCriticism: detectCriticism,
   _isNewbie: isNewbie, _markNewbie: markNewbie, _looksLikeQuestion: looksLikeQuestion,
-  _takeImgDescs: takeImgDescs, _stripForLearn: stripForLearn, _describeImgs: describeImgs,
+  _takeImgDescs: takeImgDescs, _stripForLearn: stripForLearn, _describeImgs: describeImgs, _turnPromptContent: turnPromptContent,
   _parseSegments: parseSegments, _keepVideoRef: keepVideoRef, _recentVideoRef: recentVideoRef,   // 视频链路自测用
   _grpAutoTick: grpAutoTick, _grpAutoConsume: grpAutoConsume, _recordAt: recordAt, _isMasterUid: isMasterUid,
   _groupAtNeed: groupAtNeed, _greetOnii: greetOnii,

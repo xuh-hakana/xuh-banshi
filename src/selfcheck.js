@@ -194,10 +194,10 @@ function dataCheck() {
       (names.length === 0
         ? '常用.md 一条场合都没登记（她一张表情都不会发）'
         : (miss.length
-          ? miss.length + ' 张登记了场合但找不到图：' + miss.slice(0, 6).join('、') + ' → 图要放进 data/stickers/常用/'
+          ? miss.length + ' 张登记了场合但找不到图：' + miss.slice(0, 6).join('、') + ' → 图要放进 ' + require('./sticker-paths').relSticker() + '/常用/'
           : '每张都能找到'))
       + (noOcc.length ? '｜另有 ' + noOcc.length + ' 张有图没登记场合（不会发）：' + noOcc.slice(0, 6).join('、') : ''));
-    if (miss.length) results.problems.push({ file: 'data/stickers/常用.md', what: '登记的场合找不到图', detail: miss.join('、') });
+    if (miss.length) results.problems.push({ file: require('./sticker-paths').relSticker() + '/常用.md', what: '登记的场合找不到图', detail: miss.join('、') });
   } catch (e) {
     say('表情常用单', false, '读不出来：' + String(e.message).slice(0, 60));
   }
@@ -484,14 +484,14 @@ function speedCheck() {
   (async () => {
     const k = 'g_bench';
     console.log('== 单项基准（每条消息都会走一遍的部分）==');
-    core.setTurn(k, { source: 'qq', uid: '123456', gid: 100000000, nick: '测试群友', isMaster: false, atMe: true });
+    core.setTurn(k, { source: 'qq', uid: '123456', gid: 1000000004, nick: '测试群友', isMaster: false, atMe: true });
     core.pushHist(k, 'user', '测试群友说: 这个bot响应速度怎么样啊');
     core.pushHist(k, 'assistant', '还行吧，嘻嘻，你问这个干嘛');
-    core.setTurn(k, { source: 'qq', uid: '123456', gid: 100000000, nick: '测试群友', isMaster: false, atMe: true });
+    core.setTurn(k, { source: 'qq', uid: '123456', gid: 1000000004, nick: '测试群友', isMaster: false, atMe: true });
 
     console.log('\nsystemPrompt 长度：' + core.systemPrompt().length + ' 字符\n');
     timeIt('systemPrompt()', () => core.systemPrompt(), 20);
-    core.setTurn(k, { source: 'qq', uid: '123456', gid: 100000000, nick: '测试群友', isMaster: false, atMe: true, uid2: 0 });
+    core.setTurn(k, { source: 'qq', uid: '123456', gid: 1000000004, nick: '测试群友', isMaster: false, atMe: true, uid2: 0 });
     timeIt('buildMessages()（无联网路径）', () => core.buildMessages(k, '这个bot响应速度怎么样啊', ''), 20);
     timeIt('readTopics（话题jsonl 全量解析）', () => core.readTopics(), 20);
     timeIt('promiseLines()', () => core.readPromises(), 20);
@@ -502,7 +502,7 @@ function speedCheck() {
     timeIt('guides.search（攻略库）', () => require('./guides').search('折射怎么打', 3), 20);
     timeIt('matchTrigger()（读 config）', () => core.matchTrigger('随便说点什么'), 20);
 
-    core.setTurn(k, { source: 'qq', uid: '123456', gid: 100000000, nick: '测试群友', isMaster: false, atMe: true });
+    core.setTurn(k, { source: 'qq', uid: '123456', gid: 1000000004, nick: '测试群友', isMaster: false, atMe: true });
     let total = 0;
     {
       const t0 = process.hrtime.bigint();
@@ -521,22 +521,22 @@ function demoCheck() {
     {
       name: '样例1 · 主人范例原题（司凤/老冯，测 2 层+AI 点评）',
       xd: {
-        target: '（他引用的消息）虚幻：司凤是什么意思？你是在说我吗',
-        person: ['主人：@虚幻之海的电子幽灵 不要啊，我的老冯'],
+        target: '（他引用的消息）电子之海的虚幻幽灵：司凤是什么意思？你是在说我吗',
+        person: ['元囮妈妈-婚内单身：@虚幻之海的电子幽灵 不要啊，我的老冯'],
         group: [
-          '虚幻：司凤是什么意思？你是在说我吗？',
-          '主人：@虚幻之海的电子幽灵 不要啊，我的老冯',
-          '虚幻：呜呜，主人的老冯不能不要啊！',
+          '电子之海的虚幻幽灵：司凤是什么意思？你是在说我吗？',
+          '元囮妈妈-婚内单身：@虚幻之海的电子幽灵 不要啊，我的老冯',
+          '电子之海的虚幻幽灵：呜呜，主人的老冯不能不要啊！',
         ],
-        after: ['主人：笑死'],
+        after: ['元囮妈妈-婚内单身：笑死'],
       },
     },
     {
       name: '样例2 · 半截反常识梗（测自有梗库资料链）',
       xd: {
-        target: '乙：生鱼片实际是死鱼片，等红灯实际是等绿灯',
-        person: ['乙：生鱼片实际是死鱼片，等红灯实际是等绿灯'],
-        group: ['乙：生鱼片实际是死鱼片，等红灯实际是等绿灯', '雷课：？'],
+        target: '大肥鱼：生鱼片实际是死鱼片，等红灯实际是等绿灯',
+        person: ['大肥鱼：生鱼片实际是死鱼片，等红灯实际是等绿灯'],
+        group: ['大肥鱼：生鱼片实际是死鱼片，等红灯实际是等绿灯', '雷课：？'],
         after: [],
       },
     },
@@ -549,7 +549,7 @@ function demoCheck() {
           '雷课：我以前是个胖子，后来瘦了',
           '德川：瘦了多少',
           '雷课：瘦了心',
-          '虚幻：呜呜主人瘦了也很棒哦，要好好吃饭呀',
+          '电子之海的虚幻幽灵：呜呜主人瘦了也很棒哦，要好好吃饭呀',
         ],
         after: ['雷课：……'],
       },

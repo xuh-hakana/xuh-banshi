@@ -1,5 +1,5 @@
 // 面板回归测试：导航结构 / 标签只放 md / 话题三页 / 看每个人 / 聊天记录 / 灰底 / 触发地图
-const { chromium } = require('C:/Users/user/.workbuddy/binaries/node/workspace/node_modules/playwright');
+const { chromium } = require('C:~/.workbuddy/binaries/node/workspace/node_modules/playwright');
 
 (async () => {
   const errors = [];

@@ -86,7 +86,7 @@ const t = (name, ok, why) => {
     t('被测对象确实取到了地区原文', !!regBrief, '地区原文为空：' + JSON.stringify(regRaw));
 
     // ===== ② 群聊 =====
-    const gid = '100000000';
+    const gid = '1000001000';
     const k = 'roster_grp_' + process.pid;
     core.teachSetPresent(k, [sid]);
     core.setTurn(k, { uid: sid, nick: label, gid, atMe: true, scope: '群' + gid });
@@ -170,13 +170,13 @@ const t = (name, ok, why) => {
     t('qq.js 的「观察到别人喊」必须带明确称呼动词',
       /looksLikeCallContext\(body\.slice\(0, at\)\)/.test(qqSrc), '只靠 looksLikeName 还会把 @ 邻字写进代称');
     t('「这一叫我…」不会被截成名字',
-      nickMod.callMeName('叫它乙?这一叫我都觉得脸上有点挂不住喵') === '',
-      '又从句子腰上截出 ' + nickMod.callMeName('叫它乙?这一叫我都觉得脸上有点挂不住喵'));
+      nickMod.callMeName('叫它大肥鱼?这一叫我都觉得脸上有点挂不住喵') === '',
+      '又从句子腰上截出 ' + nickMod.callMeName('叫它大肥鱼?这一叫我都觉得脸上有点挂不住喵'));
     t('「叫我 XX」祈使句照旧认',
       nickMod.callMeName('以后大家就叫我 Ayami') === 'Ayami', '合法祈使句被误挡');
     t('@ 邻字没有「叫/喊」动词就不记',
       !nickMod.looksLikeCallContext('↩回复@白：我也有这个警告↩ ')
-      && !nickMod.looksLikeCallContext('@100000000 就是什么都没发才恶心'),
+      && !nickMod.looksLikeCallContext('@1000001001 就是什么都没发才恶心'),
       '还是把聊天片段当称呼上下文');
     t('@ 前面写「叫他/喊她/称呼对方」才记',
       nickMod.looksLikeCallContext('叫他 ') && nickMod.looksLikeCallContext('喊她')

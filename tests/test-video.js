@@ -120,9 +120,9 @@ const sh = (bin, args) => execFileSync(bin, args, { stdio: ['ignore', 'pipe', 'p
   t('联网摘要只抽短句，解释段（不难看出/综上）丢掉',
     (() => { const w = core._xdWebStyle('分类：反问型\n用法示例：你是怎么做到的\n不难看出这里很好笑\n示例：包的呀', 'S1');
       return w.length >= 2 && w.every(s => !/不难看出|综上/.test(s)); })());
-  const xdV = { scope: 'quote', target: '（他引用的消息）乙：司凤是什么意思' };
-  const goodAns = ['【聊天记录】', '乙：司凤是什么意思', '【解析】', '资料：司凤谐音死冯。',
-    '对话中「乙」说「司凤是什么意思」意思是自己的老妈死了，此为1层笑点。',
+  const xdV = { scope: 'quote', target: '（他引用的消息）大肥鱼：司凤是什么意思' };
+  const goodAns = ['【聊天记录】', '大肥鱼：司凤是什么意思', '【解析】', '资料：司凤谐音死冯。',
+    '对话中「大肥鱼」说「司凤是什么意思」意思是自己的老妈死了，此为1层笑点。',
     '而蠢蠢的ai，回复「你是在说我吗」。没有理解这句话的双关，令人忍俊不禁喵。'].join('\n');
   t('合格答案通过质检（资料行 + 此为1层笑点 + 术语 + 喵）', core._xdCheck(goodAns, xdV).ok === true, core._xdCheck(goodAns, xdV).why);
   t('缺「资料：」行判不合格，理由写清',
@@ -130,11 +130,11 @@ const sh = (bin, args) => execFileSync(bin, args, { stdio: ['ignore', 'pipe', 'p
   t('层号不从 1 开始判不合格',
     (() => { const r = core._xdCheck(goodAns.replace('此为1层笑点', '此为2层笑点'), xdV); return r.ok === false && /层/.test(r.why); })());
   t('有引用时解析到了对话其它条 → 不合格（只解析目标那条）',
-    (() => { const bad = ['【聊天记录】', '乙：司凤是什么意思', '小海豹：就是死冯啊', '【解析】', '资料：（没查到明确资料）',
+    (() => { const bad = ['【聊天记录】', '大肥鱼：司凤是什么意思', '小海豹：就是死冯啊', '【解析】', '资料：（没查到明确资料）',
         '对话中「小海豹」说「就是死冯啊」是谐音梗，此为1层笑点。', '令人忍俊不禁喵'].join('\n');
       const r = core._xdCheck(bad, xdV); return r.ok === false && /没被选中/.test(r.why); })());
   t('一个术语/说法都没有 → 不合格（太板正）',
-    (() => { const bad = ['【聊天记录】', '乙：司凤是什么意思', '【解析】', '资料：（没查到明确资料）',
+    (() => { const bad = ['【聊天记录】', '大肥鱼：司凤是什么意思', '【解析】', '资料：（没查到明确资料）',
         '他说的这个事情吧反正就是这样的，此为1层笑点。', '令人忍俊不禁喵'].join('\n');
       const r = core._xdCheck(bad, xdV); return r.ok === false && /太板正/.test(r.why); })());
   t('聊天腔禁项仍拦：希望有帮助/我会好好分析',
@@ -142,16 +142,16 @@ const sh = (bin, args) => execFileSync(bin, args, { stdio: ['ignore', 'pipe', 'p
       const r = core._xdCheck(bad, xdV); return r.ok === false && /禁项/.test(r.why); })());
   // 2026-11-24：格式全过但没解析出笑点 → 不合格（占位符/空话/无实质/没引原话）
   t('聊天记录照抄「代称」占位符 → 不合格',
-    (() => { const r = core._xdCheck(goodAns.replace('乙：司凤是什么意思', '代称：司凤是什么意思'), xdV);
+    (() => { const r = core._xdCheck(goodAns.replace('大肥鱼：司凤是什么意思', '代称：司凤是什么意思'), xdV);
       return r.ok === false && /占位符|代称/.test(r.why); })());
   t('空话「正是笑点所在」→ 不合格',
     (() => { const r = core._xdCheck(goodAns.replace('意思是自己的老妈死了，', '意思是自己的老妈死了，正是笑点所在，'), xdV);
       return r.ok === false && /空话/.test(r.why); })());
   t('某层没有实质内容 → 不合格',
-    (() => { const r = core._xdCheck(goodAns.replace('对话中「乙」说「司凤是什么意思」意思是自己的老妈死了，', '笑死，'), xdV);
+    (() => { const r = core._xdCheck(goodAns.replace('对话中「大肥鱼」说「司凤是什么意思」意思是自己的老妈死了，', '笑死，'), xdV);
       return r.ok === false && /没有实质/.test(r.why); })());
   t('解析没引用目标原话 → 不合格',
-    (() => { const bad = ['【聊天记录】', '乙：司凤是什么意思', '【解析】', '资料：（没查到明确资料）',
+    (() => { const bad = ['【聊天记录】', '大肥鱼：司凤是什么意思', '【解析】', '资料：（没查到明确资料）',
         '他这个问题问得真好，大家听完都乐了，此为1层笑点。', '这句话有双关，令人忍俊不禁喵'].join('\n');
       const r = core._xdCheck(bad, xdV); return r.ok === false && /原话/.test(r.why); })());
   t('提示词契约：昵称规则 + 四问，不再有「代称：原话」',

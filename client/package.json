@@ -1,0 +1,15 @@
+{
+  "name": "xuhbot-client",
+  "version": "0.4.0",
+  "private": true,
+  "description": "虚幻 · 桌面客户端（Electron 主进程 + 原版雨夜玻璃界面；公开版只留表情包 / 搬屎 / 参数开关）",
+  "author": "虚幻 (@xuh-hakana)",
+  "license": "see LICENSE",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^45.2.1"
+  }
+}

@@ -90,13 +90,18 @@ function partOf(key) {
 }
 
 // 原子写：写临时文件再 rename，不会出现半截文件
+// 2026-11-25：临时文件名带 pid+随机（原来固定 '.tmp'，机器人进程和面板同时存会撞车），
+// 读-改-写整段进跨进程锁，避免「两边各改各的、后写的把先写的吞掉」。
 function _writePart(part, mutator) {
   const p = _partPath(part);
-  let cur = _readPart(part);
-  mutator(cur);
-  const tmp = p + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(cur, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, p);
+  const atomic = require('../util/atomic');
+  const lock = require('../util/lock');
+  lock.withLock(p, () => {
+    const cur = _readPart(part);      // 锁内重读，拿的一定是最新的
+    mutator(cur);
+    const r = atomic.writeJsonAtomic(p, cur);
+    if (!r.ok) throw new Error('写不了 ' + p + '：' + r.error);
+  }, { ttlMs: 10000, waitMs: 4000 });
   _cache = { at: _maxMtime(), data: null }; // 让下一次 cfgLive 重新读
   return true;
 }

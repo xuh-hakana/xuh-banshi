@@ -1,0 +1,6 @@
+name: astrbot_plugin_persona_share
+display_name: 人设共用
+desc: 直接读面板管的那份人设正文；人设每轮常驻、规则按需加载，省一半以上上下文
+version: 1.3.0
+author: WorkBuddy, xuh-hakana
+repo: ""

@@ -18,6 +18,8 @@ const core = require('../core');          // 触发词表的读写只在 core �
 const chatShards = require('../chat-shards'); // 2026-11-19：聊天记录按会话分片（派生视图，按群/按人一键删、按需读）
 const { botWrite } = require('../wlog');
 const configStore = require('../config');   // 配置统一入口：从 config/ 四个分区读写
+const diag = require('../diag/report');    // 写不进去/跑不起来的都上报给守望任务（2026-11-25）
+function diagFail(area, e) { try { diag.report(area, e); } catch (e2) {} }
 const fixedTags = require('../fixed-tags'); // 2026-11-21：固定标签（面板直接加 / 解锁一次后取消）
 const rocoMerchant = require('../roco-merchant'); // 2026-11-21：洛克王国远行商人（面板预览 + 配置）
 const alarms = require('../alarms');              // 2026-11-24：她自己给自己定的闹钟（面板读四组 / 改状态 / 手加 / 删）
@@ -43,6 +45,9 @@ const qzoneComment = require('../qzone-comment');   // 2026-11-17：逛空间评
 const judge = require('../judge');            // 2026-11-19：虚幻所有发言的统一判定内核（8 scope 平铺、星标/标错/多情绪）
 
 const ROOT = path.join(__dirname, '..');
+const stickerPaths = require('../sticker-paths');   // 表情包/被拦图根从配置解析（2026-11-25，不写死路径）
+const _SDREL = path.relative(ROOT, stickerPaths.stickerRoot()).split(path.sep).join('/');
+const _BKREL = path.relative(ROOT, stickerPaths.blockedRoot()).split(path.sep).join('/');
 // 2026-11-02：面板代码搬进 xuhbot/xuhctrl/，但 soul/ data/ docs/ persona/ 都还在
 // xuhbot/xuhchatrule/ 下。ROOT 必须指回 xuhchatrule，否则面板会去读一个空的
 // xuhctrl/data（页面上看起来就是「数据全没了」）。
@@ -55,7 +60,7 @@ if (require.main === module) process.on('uncaughtException', e => { try { fs.app
 if (require.main === module) process.on('unhandledRejection', e => { try { fs.appendFileSync(path.join(ROOT, 'data', 'panel-err.log'), new Date().toISOString() + ' [Promise兜底] ' + (e && e.stack || e) + '\n'); } catch {} });
 // 人设按层物理切开（2026-11-21）：F 全场景基底 / H 全聊天应对 / D 平台功能。客户端要能列出、能看、能改。
 // docs/长期记忆实现原文：实现原文副本在子目录里，listFiles 只扫 DIRS 的一级，所以单独登记，老面板也能列出来看。
-const DIRS = ['soul', 'soul/F-全场景通用主人设', 'soul/H-全聊天', 'soul/H-全聊天/应对', 'soul/D-平台功能', 'data', 'data/记忆', 'data/记忆/日志', 'data/guides', 'docs', 'docs/长期记忆实现原文', 'data/diary', 'persona', 'data/stickers'];
+const DIRS = ['soul', 'soul/F-全场景通用主人设', 'soul/H-全聊天', 'soul/H-全聊天/应对', 'soul/D-平台功能', 'data', 'data/记忆', 'data/记忆/日志', 'data/guides', 'docs', 'docs/长期记忆实现原文', 'data/diary', 'persona', _SDREL, _BKREL];
 const SYS_KEYS = { soul: 'soul/F-全场景通用主人设/虚幻.md', extra: '', memory: 'data/人物列表.md' };
 const rel = p => path.relative(ROOT, p).replace(/\\/g, '/');
 const abs = r => path.resolve(ROOT, r);
@@ -445,7 +450,7 @@ const FILE_META = {
   'data/笑点解析范例.md': { cat: 'soul', kind: 'md', use: '笑点解析的格式范例（主人 2026-10-22 亲手写的标准答案）。每次笑点解析都把这篇塞给模型照着学——改这里的格式，她的解析格式就跟着变', range: '「标准答案」一节的第一行固定「这是一段QQ聊天记录。」；资料行必须有；每层笑点结尾「令人忍俊不禁」，最后一层「令人忍俊不禁喵」；后面还有「反例」一节（照格式不解析的坏例 + 改好的合格版），跟参照一起喂给模型' },
   'data/trpg.json':     { cat: 'feature', kind: 'json', use: 'TRPG 骰子 / 角色卡数据', range: '' },
   // —— 人设 → 长期记忆 ——
-  'data/人物喜好.md':    { cat: 'soul', kind: 'md', hidden: true, use: '**只有别人**的口味，原文一节一个账号、好感高的在前：QQ 写成 `## 名字（123456）`，B站 写成 `## 名字（B站 30895294）`（括号里没平台前缀就按 QQ 算，老写法照旧）；面板按人物名下所有平台账号合并展示并标来源——点开某人就能看到；**黑名单群（如赛博鱼塘 100000000）里的人不记好感，不会出现在这里**；**你自己（主人＝虚幻）的口味不在这张表**，在 `soul/F-全场景通用主人设/0-我的喜好.md`（人设层）', range: '确定=本人亲口说；待确认=提过没表态（等你在面板里选）；可能=猜的（较中立但有偏好）' },
+  'data/人物喜好.md':    { cat: 'soul', kind: 'md', hidden: true, use: '**只有别人**的口味，原文一节一个账号、好感高的在前：QQ 写成 `## 名字（123456）`，B站 写成 `## 名字（B站 30895294）`（括号里没平台前缀就按 QQ 算，老写法照旧）；面板按人物名下所有平台账号合并展示并标来源——点开某人就能看到；**黑名单群（如赛博鱼塘 143620228）里的人不记好感，不会出现在这里**；**你自己（主人＝虚幻）的口味不在这张表**，在 `soul/F-全场景通用主人设/0-我的喜好.md`（人设层）', range: '确定=本人亲口说；待确认=提过没表态（等你在面板里选）；可能=猜的（较中立但有偏好）' },
   'docs/项目总览.md':     { cat: 'other', kind: 'md' },
   'docs/可复用代码与踩坑.md': { cat: 'other', kind: 'md', use: '项目文档：自定义 DNS、检索、LLM 冷却、前端技巧、bat 坑', range: '' },
   'docs/项目全文件清单.md':   { cat: 'other', kind: 'md', ro: true, use: '**本项目全部文本文件全文**（图片除外）：每个文件标了面板位置 + 说明，代码文件的说明就写在它解释的那段代码前面（按段落切开，不用翻页找）。机器生成的文件（package-lock / .md5.json）和它自己不收全文', range: '' },
@@ -578,7 +583,7 @@ let biliJob = { running: false, input: '', pages: 0, seen: 0, got: 0, skip: 0, f
 const STICKER_VQ = '这是一张表情包。请用一句很短的中文说明「什么场合会发这张图」。只写场合词，用顿号分隔，不超过 20 个字。不要描述画面，不要加标点结尾，不要解释。';
 
 async function runFillJob() {
-  const SDM = path.join(ROOT, 'data', 'stickers');
+  const SDM = path.join(stickerPaths.stickerRoot());
   const MDM = path.join(SDM, '常用.md');
   const imgs = [];
   // 根目录只收 q 情绪图（2026-11-02 主人定：根目录不含 q 的全无视）；关键词图在 关键词触发/
@@ -633,12 +638,9 @@ async function runFillJob() {
     fillJob.done++;
   }
   if (add.length) {
-    try {
-      const bak = MDM + '.备份-' + stampNow();
-      fs.copyFileSync(MDM, bak);
-      const cur = fs.readFileSync(MDM, 'utf8').replace(/\s*$/, '');
-      fs.writeFileSync(MDM, cur + '\n' + add.join('\n') + '\n', 'utf8');
-    } catch (e) { fillJob.log.push('写表失败：' + String(e.message).slice(0, 60)); }
+    // 2026-11-23：写表统一走 qq.js 的 appendCommonMd（备份 + 按族名去重 + 原子写）
+    const reg = require('../connectors/qq.js')._appendCommonMd(add);
+    if (!reg.ok) fillJob.log.push('写表失败：' + String(reg.error || '').slice(0, 60));
   }
   fillJob.log.push('补好 ' + fillJob.ok + ' 张，失败 ' + fillJob.fail + ' 张（常用.md 已备份）');
   fillJob.running = false;
@@ -764,7 +766,7 @@ function rulesBook() {
       R('超时必@', '回得慢要 @，让人知道这句回的是谁（所有发言类回复统一适用）',
         '只看「从这轮第一条消息到发出」花了多久：' + ms(5000) + '内回 → 不 @；超过 ' + ms(8000) + ' → 必须 @；' + ms(5000) + '~' + ms(8000) + '之间 → 一半概率 @。\n连续回同一个人时只有第一条 @（中间回过别人、或隔 10 分钟以上，才算新的一条）。\n回复里已经带了 @ 就不再加。\n适用范围：模型回复和固定话术回复（记忆回执、触发词第一句等）都走同一层。\n数值来源：代码 groupAtNeed 的 5 秒/8 秒门槛是写死的规矩（主人 2026-10-22 定），不受 config 影响。\n**例外（主人 2026-10-23 定）：「回应主人」顶上来的回复，不 @。** 她本来就该答、主人也知道她在答，一句 @ 纯属多余（而且合并等待 6 秒 + 模型思考，耗时必然超 8 秒，等于每句都 @）。@ 触发的回复（主人 @ 她 / 群友 @ 她）照上面的规矩走。'),
       R('必回的回复不 @ 主人', '主人没点名喊她的时候，回复一个字都不加 @（主人 2026-10-23 定）',
-        '主人原话：「主人讲话必回的那条规则（仅由必回触发产生的那些回复，@触发的不算）：回复我时不需要@。」\n实现：handleTurn 里 `mustReply = isMaster && !atMeReal`，整轮把 `{ mustReply: true }` 传给 applyAtTiming（模型回复 + 固定话术回复都传）；连她自己写出来的 `@主人号` 也会剥掉，但 `@别人` 照留（那是她自己 @ 的第三方）。\n**「真@她」和「引用她的话」分开记**（atMeReal）：主人只是引用了她的话 → 照样不用 @（她就在回你）；主人真的 @ 了她 → 保留「超时必 @」，那一下是提醒主人「这句回你的」。\n真事 2026-10-23：群里她说「对agent」，bot 回「@100000000 对agent？你在说什么呀？」——主人一眼看出这个 @ 不该有；后来主人引用她的话问「怎么办呀」，bot 又回「@100000000 我在」，同一个毛病。'),
+        '主人原话：「主人讲话必回的那条规则（仅由必回触发产生的那些回复，@触发的不算）：回复我时不需要@。」\n实现：handleTurn 里 `mustReply = isMaster && !atMeReal`，整轮把 `{ mustReply: true }` 传给 applyAtTiming（模型回复 + 固定话术回复都传）；连她自己写出来的 `@主人号` 也会剥掉，但 `@别人` 照留（那是她自己 @ 的第三方）。\n**「真@她」和「引用她的话」分开记**（atMeReal）：主人只是引用了她的话 → 照样不用 @（她就在回你）；主人真的 @ 了她 → 保留「超时必 @」，那一下是提醒主人「这句回你的」。\n真事 2026-10-23：群里她说「对agent」，bot 回「@1000000002 对agent？你在说什么呀？」——主人一眼看出这个 @ 不该有；后来主人引用她的话问「怎么办呀」，bot 又回「@1000000002 我在」，同一个毛病。'),
       R('主人@后回复', '主人@了谁 / 引用了谁，这一条就回谁（主人 2026-10-23 定的规矩，关键词就是这个）',
         '主人原话：「我@的是小肥鱼，可是虚幻又识别成约定了」——她@的是群友，虚幻却当成「主人在对她说教/立规矩」。'
         + '现在的口径（**只看这一条消息，不猜下一条**）：'
@@ -832,7 +834,7 @@ function rulesBook() {
       R('不许原样复制用户输入', '「某某说：」转述格式发送前剥掉',
         '发送层守卫：剥转述前缀；只有 @ 没正文的光杆 @ 一律不发；「记不清/没查到」这类空话不发。'),
       R('不许谎报做过的事', '没做成的事不许说成做成了（加群、踢人、禁言、改群名……）',
-        '真事 2026-10-23：主人私聊说「去加群100000000」，她回「已成功加入群100000000，主人～」，实测根本没进群。查过 NapCat 的 56 个群接口，**没有「按群号加群」这个动作**——她只能在别人邀请/拉她进群时自动同意。也就是说那句「已成功」是它自己编的，代码里没有任何东西告诉过它成功。'
+        '真事 2026-10-23：主人私聊说「去加群1126843213」，她回「已成功加入群1126843213，主人～」，实测根本没进群。查过 NapCat 的 56 个群接口，**没有「按群号加群」这个动作**——她只能在别人邀请/拉她进群时自动同意。也就是说那句「已成功」是它自己编的，代码里没有任何东西告诉过它成功。'
         + '现在两道：① 提示词写死——主人给群号让她加，只能答「我自己做不了，你邀请我一下 / 把我拉进去，我马上同意」，绝不许说「已加入/进群了/加好了/这就去加」；② 发送层兜底（qq.js → noFakeJoin，跟 @ 转换、引用痕迹清理同一个出口，所有发言都过）——出现「已成功加入群/已经进群了/我进群了/加好了」这类完成宣言就直接换成实话，除非半小时内真的收到过「她进群了」的系统通知。'),
     ]),
     T('身份与称呼', [
@@ -855,7 +857,7 @@ function rulesBook() {
     ]),
     T('学习', [
       R('学说话', '只学群友的自然发言',
-        '只收测试群（100000000）以外的群聊发言；与@无关；机器人功能指令不收；图片=打字照学；粘贴（链接/多行/超长）不收；纯图不收。普通接话也带上文（接着谁哪句说的）。每 15 条样本自动重写风格文件，所以人写的 soul 和机器写的风格文件分开。'),
+        '只收测试群（1000000004）以外的群聊发言；与@无关；机器人功能指令不收；图片=打字照学；粘贴（链接/多行/超长）不收；纯图不收。普通接话也带上文（接着谁哪句说的）。每 15 条样本自动重写风格文件，所以人写的 soul 和机器写的风格文件分开。'),
       R('口味学习', '主人说的喜恶直接进她的「可能」档',
         '完全认可是同一个人设：主人随口说的喜恶直记虚幻可能档（from=主人亲口说的）。口味三态：确定>可能>待确认；待确认等主人在面板拖到确定。比较题先查口味站队。'),
       R('主人约定', '主人的话什么时候算「对她说的」（关键词就是这个，主人 2026-10-23 定的）',
@@ -906,7 +908,7 @@ function rulesBook() {
     ]),
     T('保护与自查', [
       R('暂停/允许', '主人私聊遥控，范围内一切发言全停',
-        '「暂停群100000000」「暂停私聊欧尼酱」，可带时长（30分钟/2小时/1天）到点自动恢复；「允许xx」解；「暂停列表」查看。聊天照记，骰子/笑点解析/攻略也停。主人的遥控命令永远能用。'),
+        '「暂停群894917172」「暂停私聊欧尼酱」，可带时长（30分钟/2小时/1天）到点自动恢复；「允许xx」解；「暂停列表」查看。聊天照记，骰子/笑点解析/攻略也停。主人的遥控命令永远能用。'),
       R('自查提醒', '功能坏了/文件丢了 → 攒 10 分钟私信告诉主人',
         '每 5 分钟体检：配置可解析、必备文件非空、梗库≥1000 条、表情单完整、NapCat 3 分钟内有心跳、模型连通（30 分钟一次）。问题持续 10 分钟 → 私信主人，修好前每小时再提一次。'),
       R('虚幻自查（面板看）', '自查/失败/模型故障一起进状态栏那个灯',
@@ -952,7 +954,7 @@ function featureStates() {
   // 2026-11-03：视觉包现在分五个池（常用/可用/虚幻/关键词触发/少用），根目录早已清空。
   // 以前只数根目录，重排后就一直是 0 —— 开关页会误报「表情包=关」。这里改成数全部池。
   try {
-    const SD = path.join(ROOT, 'data', 'stickers');
+    const SD = path.join(stickerPaths.stickerRoot());
     const walk = d => {
       let n = 0;
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -1482,7 +1484,7 @@ const TABLES = {
     file: BILI_DATA_DIR + '/affection.json',
     kind: 'kv',
     hint: 'B站和QQ共用的好感度（0~100），一条=一个人：键是 B站UID 或 QQ号，值是分数。'
-      + '好感度 > 80 才能要求虚幻转发动态；主人自己（30895294 / QQ 100000000）固定 100，改别的数也会被插件启动时刷回 100。'
+      + '好感度 > 80 才能要求虚幻转发动态；主人自己（30895294 / QQ 1000000002）固定 100，改别的数也会被插件启动时刷回 100。'
       + '改完 B站侧立刻生效；有绑定关系的 QQ 号会自动同步到 QQ 侧（data/favor.json）。'
       + '（2026-11-03 起好感度归到「人物」：同一个人在 QQ 和 B站 各有一个号，就是一个人物，两边共用同一个数。）',
   },
@@ -1754,7 +1756,7 @@ const starKey = e => core.starsKey(e && e.t, e && e.nick, e && e.text);
 /* 好感度页已定的规则（主人 2026-11-07：「直接用」）：一个人挂多个平台账号，共享一个好感度。
  * 聊天日志只存显示名、不存号；这里按 people.json 的「确认名 / 资料卡名 / 群名片 / 代称」
  * 反查回人物，同一个人的两个号才会并成一个会话。查不到的如实写「没存号」，不编。
- * 名字和号显示成什么样也照好感度页（people.labelOfKey）：「主人（QQ 100000000）」「主人（B站 30895294）」。
+ * 名字和号显示成什么样也照好感度页（people.labelOfKey）：「主人（QQ 1000000002）」「主人（B站 30895294）」。
  *
  * 2026-11-07 主人追加：「如果我两个号都有头像就分别记，其他平台的头像也都分别记，但都是同一个人」。
  * 所以这里不是「一个人一个号」，而是「一个人 + 一组 (平台,号)」：会话按平台分开，
@@ -1769,7 +1771,7 @@ function chatNameIndex() {
   const idx = new Map();
   // 群内「显示名 → 号」：从人物表每个账号的 cards（这个号在某群叫什么）现算。
   // 和认人读的是同一份 cards，不另建表、不另走记录链路 —— 只在此处现算一次。
-  // 跨群同名（两个群都有「乙」）靠它分开，群聊头像不再串。
+  // 跨群同名（两个群都有「大肥鱼」）靠它分开，群聊头像不再串。
   idx._groups = new Map();   // 群号 → Map(名字key → hit)
   const put = (k, v) => {
     const key = chatNameKey(k);
@@ -1951,7 +1953,7 @@ function parseChatLine(line, nameIdx, bot, masterLabel, lastPriv) {
     e.convKind = 'group';
     e.convLabel = qmeta.groupLabel(e.scope);
     // 群聊按「这个群里的这个名字」认人：先从 cards 现算的群内表取，
-    // 取不到才退回全局名字表。这样两个群都有「乙」也不会串头像。
+    // 取不到才退回全局名字表。这样两个群都有「大肥鱼」也不会串头像。
     const gid = String(e.scope).replace(/\D/g, '');
     const gm = nameIdx && nameIdx._groups && nameIdx._groups.get(gid);
     const ghit = gm && (gm.get(chatNameKey(e.nick)) || gm.get(chatNameKey(bareNick)));
@@ -2424,7 +2426,8 @@ function readNews() {
   try { return JSON.parse(fs.readFileSync(NEW_STORE, 'utf8')) || {}; } catch { return {}; }
 }
 function writeNews(o) {
-  try { fs.mkdirSync(path.dirname(NEW_STORE), { recursive: true }); fs.writeFileSync(NEW_STORE, JSON.stringify(o, null, 1), 'utf8'); } catch {}
+  // 红点表是两个进程都会读的状态：原子写（原来是裸 writeFileSync，写一半读就是坏 JSON）
+  try { fs.mkdirSync(path.dirname(NEW_STORE), { recursive: true }); require('../util/atomic').writeJsonAtomic(NEW_STORE, o); } catch {}
 }
 
 /* ---------- 时间 ---------- */
@@ -2580,7 +2583,7 @@ function handler(req, res) {
         const qs = new URLSearchParams(req.url.slice(req.url.indexOf('?') + 1));
         const want = String(qs.get('n') || '').trim();
         if (!want) return bad();
-        const SDIR = path.join(ROOT, 'data', 'stickers');
+        const SDIR = path.join(stickerPaths.stickerRoot());
         if (!stkImgMap || Date.now() - stkImgMapAt > 5000) {
           stkImgMap = new Map(); stkImgMapAt = Date.now();
           for (const [dir, pre] of [['', ''], ['常用', '常用/'], ['可用', '可用/'], ['虚幻', '虚幻/'], ['关键词触发', '关键词触发/'], ['少用', '少用/']]) {
@@ -2678,6 +2681,23 @@ function handler(req, res) {
       return json(st);
     }
 
+    // 面板标（2026-11-23 主人定）：各群搬屎列队总数量、色图、已读/未读图、24h 报错，一次取全
+    if (req.method === 'GET' && req.url === '/api/board') {
+      const out = { ok: true, poop: { total: 0, byGroup: [] }, media: { total: 0, read: 0, unread: 0, nsfw: 0 }, blocked: { files: 0, bytes: 0, keepDays: 30 }, errs: { count24h: 0, recent: [] } };
+      /* 统计只走 src/poop-stats.js（唯一真源）：以前在这里自己扫缓存，路径还写成 <repo>/data，
+       * 缓存真身在 src/data，导致队列恒 0；公开客户端/私有客户端读的也是同一份结果。 */
+      try {
+        out.poop = require(__dirname + '/../poop-stats.js').poopStats();
+      } catch (e) { try { console.log('[面板] 搬屎统计失败：' + e.message); } catch (e2) {} }
+      try { out.media = require(__dirname + '/../media-index.js').counts(); } catch (e) {}
+      // 被拦图（2026-11-25 主人定）：独立目录、默认 30 天自动清，表情包不自动清
+      try { out.blocked = require(__dirname + '/../blocked-store.js').stats(); } catch (e) { out.blocked = { files: 0, bytes: 0, keepDays: 30, dir: _BKREL }; }
+      try {
+        const el = require(__dirname + '/../err-log.js');
+        out.errs = { count24h: el.count24h(), recent: el.recent(10) };
+      } catch (e) {}
+      return json(out);
+    }
     if (req.method === 'GET' && req.url === '/api/all') {
       const files = listFiles();
       const data = {};
@@ -2725,14 +2745,54 @@ function handler(req, res) {
         }
         configStore.writeFull(j);
         return json({ ok: true, usage: j.usage });
-      } catch (e) { return json({ error: '写不了 config：' + e.message }); }
+      } catch (e) { diagFail('panel-config', e); return json({ error: '写不了 config：' + e.message }); }
     }
     // 让她下一轮开思考（写个临时开关，core 在发请求前取走并删除，只生效一轮）
     if (req.method === 'POST' && req.url === '/api/thinking/ask') {
       try {
-        fs.writeFileSync(path.join(ROOT, 'data', 'think-request.json'), JSON.stringify({ at: Date.now() }), 'utf8');
+        // 这个文件机器人进程会取走并删除：必须原子写，否则她可能读到半截 JSON
+        const _wr = require('../util/atomic').writeJsonAtomic(path.join(ROOT, 'data', 'think-request.json'), { at: Date.now() });
+        if (!_wr.ok) throw new Error(_wr.error);
         return json({ ok: true });
-      } catch (e) { return json({ error: '写不了开关：' + e.message }); }
+      } catch (e) { diagFail('panel-thinking', e); return json({ error: '写不了开关：' + e.message }); }
+    }
+    // 多重真相回看（2026-11-25）：judge / 群友视角 / 记录员 三份产出 + inbox 尾巴
+    if (req.method === 'GET' && req.url.indexOf('/api/multitruth') === 0) {
+      const MTR = path.join(ROOT, 'src', 'data', 'multi-truth');
+      const q = new URL('http://x' + req.url).searchParams;
+      const n = Math.max(1, Math.min(100, Number(q.get('n')) || 20));
+      const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return null; } };
+      const readText = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (e) { return ''; } };
+      let latest = readJson(path.join(MTR, 'out', 'latest.json'));
+      let inbox = [];
+      try {
+        const dir = path.join(MTR, 'inbox');
+        const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+        // 取最近改过的那一份（就是当前最活跃的群）
+        files.sort((a, b) => fs.statSync(path.join(dir, b)).mtimeMs - fs.statSync(path.join(dir, a)).mtimeMs);
+        if (files.length) {
+          inbox = readText(path.join(dir, files[0])).split('\n').filter(Boolean).slice(-n)
+            .map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+        }
+        inbox.files = files;
+      } catch (e) {}
+      return json({
+        latest,
+        inbox,
+        judge: readText(path.join(MTR, 'work', 'judge.md')).slice(0, 4000),
+        views: readText(path.join(MTR, 'work', 'views.md')).slice(0, 6000),
+        recorder: readText(path.join(MTR, 'work', 'recorder.md')).slice(0, 4000),
+      });
+    }
+    // 手动跑一次流水线（复用 multi-truth.kick，节流挡着就如实说）
+    if (req.method === 'POST' && req.url === '/api/multitruth/kick') {
+      try {
+        const mt = require('../multi-truth');
+        const k = String(d.k || '').trim();
+        if (!k) return json({ error: '缺会话 k' });
+        mt.kick(k).then(r => { try { console.log('[panel] 手跑多重真相：' + JSON.stringify(r).slice(0, 200)); } catch (e) {} });
+        return json({ ok: true, k });
+      } catch (e) { diagFail('panel-multitruth', e); return json({ error: '跑不起来：' + e.message }); }
     }
     // 拖拽换分类：把文件归到另一个大类（写进 config.panel.catOverride）
     if (req.method === 'POST' && req.url === '/api/cat') {
@@ -3434,7 +3494,7 @@ function handler(req, res) {
         if (buf.length > 8 * 1024 * 1024) return json({ ok: false, error: '图太大（超过 8MB）' });
         let name = String(d.name || '').trim().replace(/[\\/:*?"<>|\r\n\t]/g, '');
         if (!name) name = 'q' + Date.now();
-        const dir = path.join(ROOT, 'data', 'stickers', '少用');
+        const dir = path.join(stickerPaths.stickerRoot(), '少用');
         try { fs.mkdirSync(dir, { recursive: true }); } catch {}
         let f = name + '.' + ext, i = 2;
         while (fs.existsSync(path.join(dir, f))) { f = name + i + '.' + ext; i++; }
@@ -3447,7 +3507,7 @@ function handler(req, res) {
     // 写完这些图就不算「自动分类」了（面板里颜色变回普通），计数也归零。
     if (req.method === 'POST' && req.url === '/api/stickers/commit') {
       try {
-        const SDIR = path.join(ROOT, 'data', 'stickers');
+        const SDIR = path.join(stickerPaths.stickerRoot());
         const MD = path.join(SDIR, '常用.md');
         const imgs = [];
         for (const [dir, pre] of [['', ''], ['常用', '常用/'], ['可用', '可用/'], ['虚幻', '虚幻/']]) {
@@ -3512,7 +3572,7 @@ function handler(req, res) {
       try {
         const core = require('../core');
         const txt = core._stickerListRebuild() || '';
-        const LP = path.join(ROOT, 'data', 'stickers', '清单.md');
+        const LP = path.join(stickerPaths.stickerRoot(), '清单.md');
         let at = 0;
         try { at = fs.statSync(LP).mtimeMs; } catch {}
         return json({ ok: true, rows: txt.split('\n').filter(l => /^-\s/.test(l)).length,
@@ -3522,7 +3582,7 @@ function handler(req, res) {
 
     if (req.method === 'POST' && req.url === '/api/stickers/rename') {
       try {
-        const SDIR = path.join(ROOT, 'data', 'stickers');
+        const SDIR = path.join(stickerPaths.stickerRoot());
         const from = String(d.from || '').trim();
         const rawTo = String(d.to || '').trim();
         // 只认这四个位置（根目录 + 三个池），和 /api/stkimg 一个口径，越界一律找不到
@@ -3585,7 +3645,7 @@ function handler(req, res) {
      * 不碰 情绪表情.json：情绪留着，只是变成「没图」，她以后放回同名图就自动接上。 */
     if (req.method === 'POST' && req.url === '/api/stickers/delete') {
       try {
-        const SDIR = path.join(ROOT, 'data', 'stickers');
+        const SDIR = path.join(stickerPaths.stickerRoot());
         const from = String(d.name || '').trim();
         if (!from) return json({ error: '没告诉我要删哪张' });
         let hit = null;
@@ -3665,7 +3725,7 @@ function handler(req, res) {
     // 原来这两个功能在一个 .command 命令行脚本里，她按 3 没反应、按 4 是重复数字 —— 搬进面板。
     // 管两件事：① 清理已删图的指纹（.md5.json 不越攒越大）② 「用模型补描述」开关（默认关，开了才花积分）
     if (req.url === '/api/stickers/maint' && (req.method === 'GET' || req.method === 'POST')) {
-      const SDM = path.join(ROOT, 'data', 'stickers');
+      const SDM = path.join(stickerPaths.stickerRoot());
       const MD5M = path.join(SDM, '.md5.json');
       const MDM = path.join(SDM, '常用.md');
       const listImgs = () => {
@@ -4754,7 +4814,7 @@ function handler(req, res) {
         const kids = all.filter(k => k.parent === x.id);
         return kids.length ? Object.assign({}, x, { kids }) : x;
       });
-      // 约定挂在谁名下，名字在服务端算好（'白（B站 100000000）'）：
+      // 约定挂在谁名下，名字在服务端算好（'白（B站 434882781）'）：
       // 平台名只有 people.js 一份注册表，客户端别自己再写一张 ——
       // 以后加小红书/抖音/小黑盒，前端一行都不用改。没有 qq 的是通用约定，不塞这个字段。
       const named = withKids.map(x => {
@@ -4804,7 +4864,7 @@ function handler(req, res) {
         return json(kb.api(act, d || {}));
       }
     }
-    /* 教学条（2026-11-12 主人定）：带 id 署名、按方向另存、只在教的人在场时用。
+    /* 教学条（2026-11-12 主人定）：带 id 署名、按方向另存、只在教的人在场时用。 */
     if (req.method === 'GET' && (req.url === '/api/teach' || req.url.indexOf('/api/teach?') === 0)) {
       const all = core.teachList().map(x => {
         let whoName = '';
@@ -5566,7 +5626,7 @@ function stickerSnapshot() {
       let rec = { pureDesc: 0, classified: 0, needDesc: [], renamed: [], filled: 0 };
       try { rec = require('../connectors/qq.js')._stickerReconcile() || rec; }
       catch (e) { console.log('[panel] 对账失败：' + e.message); }
-      const SDIR = path.join(ROOT, 'data', 'stickers');
+      const SDIR = path.join(stickerPaths.stickerRoot());
       const SCOM = path.join(SDIR, '常用');
       // 池（2026-11-08 口径）：常用/ 与 虚幻/ 同级，同属 main 48；可用 6；关键词触发 8；少用/根目录 1。
       // 虚幻/ 装的是虚幻形象的表情包，不再写「并入常用」或「讲自己时优先」。

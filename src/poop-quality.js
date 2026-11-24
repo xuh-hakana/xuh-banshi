@@ -84,13 +84,30 @@ const norm = s => String(s == null ? '' : s)
   .replace(/[，。！？、；：~～…·,.!?;:'"“”‘’()（）【】\[\]「」『』\/\\|<>《》\-—]/g, '');
 
 /* text: 正文；imageKeys: 图片稳定标识数组（转发展开和 inbox 都取同一套：文件名去扩展 / url 尾段） */
-function contentKey(text, imageKeys) {
+const _ckCache = new Map();
+// 2026-11-23 主人定：省 CPU —— 同一条消息在判定里会被算两三遍（noteSent / isPremium / 转发判重），
+// 现在按（正文+图指纹+图描述）缓存结果，500 条上限，算一次就够。
+function contentKey(text, imageKeys, descTexts) {
+  const ck = String(text || '') + '\u0001' + (imageKeys || []).join(',') + '\u0001' + (descTexts || []).join(',');
+  const hit = _ckCache.get(ck);
+  if (hit !== undefined) return hit;
+  const v = _contentKeyRaw(text, imageKeys, descTexts);
+  if (_ckCache.size > 500) _ckCache.clear();
+  _ckCache.set(ck, v);
+  return v;
+}
+function _contentKeyRaw(text, imageKeys, descTexts) {
   const t = norm(text).slice(0, 1500);
   const imgs = (Array.isArray(imageKeys) ? imageKeys : [])
     .map(x => String(x || '').toLowerCase().split(/[?#]/)[0].split('/').pop().replace(/\.[a-z0-9]+$/, ''))
     .filter(Boolean).sort();
-  const raw = t + '|' + imgs.join(',');
-  if (!t && !imgs.length) return '';
+  // 图描述也算文字内容（2026-11-22 主人定）：字一样、图不一样的两条要能分开；
+  // 被收图闸挡下的截图/插画只有描述、没有可用的图 key，靠这段才有去重依据。
+  const dsc = (Array.isArray(descTexts) ? descTexts : [])
+    .map(x => norm(String(x || '')).slice(0, 300))
+    .filter(Boolean).sort();
+  const raw = t + '|' + imgs.join(',') + (dsc.length ? '|#d#' + dsc.join(',') : '');
+  if (!t && !imgs.length && !dsc.length) return '';
   return crypto.createHash('sha1').update(raw).digest('hex');
 }
 /* 从 OneBot 图片段取稳定 key：file 名（NapCat 落盘名常为 md5）优先，其次 url 尾段 */
@@ -100,6 +117,14 @@ function imageKeyOf(seg) {
   const u = String(d.url || '');
   return f && !/^base64:\/\//.test(f) ? f.split('/').pop() : (u.split('/').pop() || '');
 }
+/* 从 publisher inbox item 取图片描述（识图结果）——当文字去重依据用（2026-11-22） */
+function descsOfItem(item) {
+  const imgs = Array.isArray(item && item.images) ? item.images : [];
+  const out = imgs.map(im => String((im && im.desc) || '')).filter(Boolean);
+  if (!out.length && item && item.desc) out.push(String(item.desc));
+  return out;
+}
+
 /* 从 publisher inbox item 取图片 keys */
 function imageKeysOfItem(item) {
   return (Array.isArray(item && item.images) ? item.images : [])
@@ -111,10 +136,10 @@ function imageKeysOfItem(item) {
 /* ① 虚幻发的搬运消息：qq.js 展开转发后把 {text, imageKeys, mid} 交进来，记一条观察。
  *    用 mid 作观察索引（目标群转发消息号），点赞/回复事件带的就是这个号。 */
 const watching = new Map();   // mid -> { key, at }
-function noteSent({ mid, text, imageKeys, at }) {
+function noteSent({ mid, text, imageKeys, descs, at }) {
   const c = cfg();
   if (!c.enabled || !mid) return '';
-  const key = contentKey(text, imageKeys);
+  const key = contentKey(text, imageKeys, descs);
   if (!key) return '';
   watching.set(String(mid), { key, text: String(text || ''), at: Number(at) || Date.now() });
   if (watching.size > 2000) {
@@ -159,7 +184,18 @@ function hitByChat(text, at) {
   return any;
 }
 /* 观察项要留正文供关键词比对（watching 只存 key 不够）——noteSent 里补存 textGrams */
+const _gramCache = new Map();
+// 2026-11-23 主人定：省 CPU —— 观察项比对会对同一条正文反复切 n-gram（每条两遍），加 500 条缓存
 function grams(s, size) {
+  const nk = String(size) + '\u0001' + String(s || '');
+  const gh = _gramCache.get(nk);
+  if (gh !== undefined) return gh;
+  const g = _gramsRaw(s, size);
+  if (_gramCache.size > 500) _gramCache.clear();
+  _gramCache.set(nk, g);
+  return g;
+}
+function _gramsRaw(s, size) {
   const set = new Set();
   const clean = norm(s).replace(/[^\u4e00-\u9fa5a-z0-9]+/g, ' ');
   const n = Math.max(1, num(size, 2));
@@ -183,10 +219,10 @@ function mark(key, why, mid) {
 }
 
 /* publisher 入队前查：这条屎是否被判过优质 */
-function isPremium(text, imageKeys) {
+function isPremium(text, imageKeys, descs) {
   const c = cfg();
   if (!c.enabled) return false;
-  const key = contentKey(text, imageKeys);
+  const key = contentKey(text, imageKeys, descs);
   if (!key) return false;
   const m = load().marks[key];
   if (!m) return false;

@@ -17,18 +17,18 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
   t('主人的 B站号也被认成主人', nl.isOwner('bili', '30895294'));
   t('别人的号不进指令层', !nl.isOwner('qq', '123456') && !nl.isOwner('bili', '999999'));
 
-  const alias = nl.deterministic('这句话里 ayami(100000000) 这么说，证明这个号叫 Ayami', { platform: 'qq', uid: String(cfg.masterQQ) });
-  t('转发证据「证明某号叫X」识别成代称', alias && alias.action === 'alias_set' && alias.uid === '100000000' && alias.name === 'Ayami', JSON.stringify(alias));
+  const alias = nl.deterministic('这句话里 ayami(1000001000) 这么说，证明这个号叫 Ayami', { platform: 'qq', uid: String(cfg.masterQQ) });
+  t('转发证据「证明某号叫X」识别成代称', alias && alias.action === 'alias_set' && alias.uid === '1000001000' && alias.name === 'Ayami', JSON.stringify(alias));
   const wrong = nl.deterministic('标错：这句说错了。理由：语气太生硬', { platform: 'qq', uid: String(cfg.masterQQ) });
   t('标错 + 理由识别成真正标错动作', wrong && wrong.action === 'mark_wrong' && /语气太生硬/.test(wrong.reason), JSON.stringify(wrong));
-  const off = nl.deterministic('关闭群 100000000', { platform: 'qq', uid: String(cfg.masterQQ) });
-  t('自然语言「关闭某群」识别成群开关', off && off.action === 'group_off' && off.gid === '100000000', JSON.stringify(off));
+  const off = nl.deterministic('关闭群 1000001001', { platform: 'qq', uid: String(cfg.masterQQ) });
+  t('自然语言「关闭某群」识别成群开关', off && off.action === 'group_off' && off.gid === '1000001001', JSON.stringify(off));
   const offByName = nl.deterministic('把世界连结这个群关掉', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true });
-  t('说群名也能关（「把XX这个群关掉」）', offByName && offByName.action === 'group_off' && offByName.gid === '100000000', JSON.stringify(offByName));
+  t('说群名也能关（「把XX这个群关掉」）', offByName && offByName.action === 'group_off' && offByName.gid === '1000001001', JSON.stringify(offByName));
   const offNoId = nl.deterministic('关闭这个群', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true, convKey: 'qq_' + cfg.masterQQ });
   t('没说哪个群时不拿主人私聊键顶替', offNoId && offNoId.action === 'group_off' && !offNoId.gid, JSON.stringify(offNoId));
-  const selfName = nl.deterministic('以后叫我 乙', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true, account: { platform: 'qq', id: String(cfg.masterQQ) } });
-  t('本人自报「叫我X」不会截成「我」', selfName && selfName.action === 'alias_set' && selfName.name === '乙' && selfName.uid === String(cfg.masterQQ), JSON.stringify(selfName));
+  const selfName = nl.deterministic('以后叫我 大肥鱼', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true, account: { platform: 'qq', id: String(cfg.masterQQ) } });
+  t('本人自报「叫我X」不会截成「我」', selfName && selfName.action === 'alias_set' && selfName.name === '大肥鱼' && selfName.uid === String(cfg.masterQQ), JSON.stringify(selfName));
   const ask = nl.deterministic('证明他叫 小明', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true });
   t('举证没带号时反问，不瞎记', ask && ask.action === 'alias_ask', JSON.stringify(ask));
   const sw = nl.deterministic('把自动接话关了', { platform: 'qq', uid: String(cfg.masterQQ) });
@@ -52,8 +52,8 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
   const panelSrc = fs.readFileSync(path.join(ROOT, 'src', 'server', 'panel.js'), 'utf8');
   const convPath = path.join(ROOT, 'src', 'conv-settings.js');
   const convSrc = fs.readFileSync(convPath, 'utf8');
-  const biliSrc = fs.readFileSync('/Users/zhengbowen/.astrbot/data/plugins/astrbot_plugin_bilibili_ai_bot/core/private_messages.py', 'utf8');
-  const replySrc = fs.readFileSync('/Users/zhengbowen/.astrbot/data/plugins/astrbot_plugin_bilibili_ai_bot/core/reply.py', 'utf8');
+  const biliSrc = fs.readFileSync('~/.astrbot/data/plugins/astrbot_plugin_bilibili_ai_bot/core/private_messages.py', 'utf8');
+  const replySrc = fs.readFileSync('~/.astrbot/data/plugins/astrbot_plugin_bilibili_ai_bot/core/reply.py', 'utf8');
 
   t('QQ 主链：转发聊天记录会取原文', /fetchForwardEvidence\(forwards\)/.test(qqSrc), '转发证据没接进来');
   t('QQ 主链：主人私聊指令在会话关闭闸之前', qqSrc.indexOf('nlCommand.handle(cmdCtx)') < qqSrc.indexOf('convSettings.isOff(k)'), '顺序不对，会被关群闸吞掉');
@@ -80,13 +80,13 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
   const gidT = '940098';
   const gc = await nl.handleGroup({
     platform: 'qq', uid: String(cfg.masterQQ), text: '关闭群 ' + gidT,
-    isPrivate: false, convKey: 'qq_739980743', scope: '群100000000',
+    isPrivate: false, convKey: 'qq_1000000004', scope: '群1000001002',
   });
   t('主人在群里发的指令也执行', !!(gc && gc.handled && gc.ok), JSON.stringify(gc));
   t('群里关群真落盘', conv.isOff('qq_' + gidT) === true);
   await nl.handleGroup({
     platform: 'qq', uid: String(cfg.masterQQ), text: '恢复群 ' + gidT,
-    isPrivate: false, convKey: 'qq_739980743', scope: '群100000000',
+    isPrivate: false, convKey: 'qq_1000000004', scope: '群1000001002',
   });
   t('群里恢复群真落盘', conv.isOff('qq_' + gidT) === false);
 
@@ -98,7 +98,7 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
   ]) {
     const r = await nl.handleGroup({
       platform: 'qq', uid: String(cfg.masterQQ), text: txt,
-      isPrivate: false, convKey: 'qq_739980743', scope: '群100000000',
+      isPrivate: false, convKey: 'qq_1000000004', scope: '群1000001002',
     });
     t(label + ' 不当指令', !(r && r.handled), JSON.stringify(r));
   }
@@ -117,7 +117,7 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
   const recTxt = '记下来：测试约定ZZZ 以后别提这个';
   const recOut = await nl.handleRecord({
     platform: 'qq', uid: '999001', nick: '路人甲', text: recTxt,
-    isPrivate: false, convKey: 'qq_739980743', scope: '群100000000',
+    isPrivate: false, convKey: 'qq_1000000004', scope: '群1000001002',
   });
   t('别人在群里「记下来」真的记成约定（记录类对所有人开放）',
     !!(recOut && recOut.handled && recOut.ok && recOut.silent), JSON.stringify(recOut));
@@ -152,12 +152,12 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
     t('「把某号的名字改成 X」识别成改名（不是代称）', rn && rn.action === 'person_name' && rn.name === '测试名Z', JSON.stringify(rn));
     const rn2 = nl.deterministic(qq + ' 叫什么', { isPrivate: true });
     t('「某号叫什么」是查名字，不改名也不加代称', rn2 && rn2.action === 'person_query', JSON.stringify(rn2));
-    // 主人真发过「100000000叫皮皮」，当时号后面直接跟中文、识别不出来 → 回「没认出指令」
-    const glue = nl.deterministic('100000000叫皮皮', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true });
+    // 主人真发过「1000001003叫皮皮」，当时号后面直接跟中文、识别不出来 → 回「没认出指令」
+    const glue = nl.deterministic('1000001003叫皮皮', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true });
     t('「号叫名」粘连写法主人在私聊发 = 改名字位', glue && glue.action === 'person_name' && glue.name === '皮皮', JSON.stringify(glue));
-    const glueOther = nl.deterministic('100000000叫皮皮', { platform: 'qq', uid: '777777', isPrivate: false });
+    const glueOther = nl.deterministic('1000001003叫皮皮', { platform: 'qq', uid: '777777', isPrivate: false });
     t('同句别人发 = 只记代称，不改名字位', glueOther && glueOther.action === 'alias_set', JSON.stringify(glueOther));
-    const proof = nl.deterministic('证明 100000000 叫 Ayami', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true });
+    const proof = nl.deterministic('证明 1000001000 叫 Ayami', { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true });
     t('「证明…叫…」一律是代称举证', proof && proof.action === 'alias_set', JSON.stringify(proof));
     const fv = nl.deterministic('把 ' + qq + ' 好感改成 55', { isPrivate: true });
     t('「把某号好感改成 N」识别成好感', fv && fv.action === 'person_favor' && fv.value === 55, JSON.stringify(fv));
@@ -169,9 +169,9 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
     t('「记一下某号喜欢 X」识别成喜好', ta && ta.action === 'taste_add' && ta.text === '猫', JSON.stringify(ta));
     const fb = nl.deterministic('兜底池加一句「测试兜底ZZZ」', { isPrivate: true });
     t('「兜底池加一句」识别成兜底词', fb && fb.action === 'fallback_add' && fb.line === '测试兜底ZZZ', JSON.stringify(fb));
-    const cs1 = nl.deterministic('这个群上下文改成10条', { isPrivate: false, convKey: 'qq_739980743' });
-    t('群里「这个群上下文改成 N 条」改的是这个会话', cs1 && cs1.action === 'conv_set' && cs1.key === 'qq_739980743' && cs1.field === 'ctx', JSON.stringify(cs1));
-    const cs2 = nl.deterministic('这个群只看不回', { isPrivate: false, convKey: 'qq_739980743' });
+    const cs1 = nl.deterministic('这个群上下文改成10条', { isPrivate: false, convKey: 'qq_1000000004' });
+    t('群里「这个群上下文改成 N 条」改的是这个会话', cs1 && cs1.action === 'conv_set' && cs1.key === 'qq_1000000004' && cs1.field === 'ctx', JSON.stringify(cs1));
+    const cs2 = nl.deterministic('这个群只看不回', { isPrivate: false, convKey: 'qq_1000000004' });
     t('「这个群只看不回」改会话 reply', cs2 && cs2.action === 'conv_set' && cs2.field === 'reply' && cs2.value === false, JSON.stringify(cs2));
     const ms = nl.deterministic('把 B站功能关了', { isPrivate: true });
     t('面板开关的中文名（B站/宝可梦/冷层记录）也能认', ms && ms.action === 'switch_set' && ms.key === 'bilibili' && ms.on === false, JSON.stringify(ms));
@@ -432,6 +432,31 @@ const t = (name, ok, why) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' : 
       fs.writeFileSync(bf, kept.join('\n') + (kept.length ? '\n' : ''), 'utf8');
     }
   } catch { /* 同上 */ }
+
+  /* ===== 触发词假成功（2026-11-25 主人报：私聊一句「四层真相…如果你没有这个功能，我怎么给你加上」
+   * 被回「触发词已处理。」，什么都没做还记 ok:true，正常发言也被吞掉）===== */
+  const MODE_TEXT = '多个真相理论：每个人有自己的真相，也同时有客观真相。你和我之间的对话会有四层真相，你理解的，我理解的，你理解的我的，我理解的你的。'
+    + '而客观真相是：我眼中你理解的我的，你眼中我理解的你的。因为我们无从知晓，所以客观。但我们可以进行可能性推理。\n'
+    + '如果你没有这个功能，我怎么给你加上';
+  t('原话不会被识别成触发词指令', nl.deterministic(MODE_TEXT, { platform: 'qq', uid: String(cfg.masterQQ), isPrivate: true }) === null);
+  t('模型自造的 trigger 参数不算真命令',
+    nl.triggerCommandOf({ action: 'trigger_add', trigger: '如果没有这个功能，我怎么给你加上', text: '原文' }) === '');
+  t('真正的触发词写法仍然认', nl.triggerCommandOf({ action: 'trigger_add', command: '不用回复：天王盖地虎' }) === '不用回复：天王盖地虎');
+
+  const badTrig = await nl._execute({ action: 'trigger_add', text: '随便一句' }, { platform: 'qq', uid: String(cfg.masterQQ) }, '随便一句');
+  t('空命令的触发词动作必须失败、不许假成功',
+    badTrig.ok === false && !/触发词已处理/.test(String(badTrig.reply)) && /\[指令失败\]/.test(String(badTrig.reply)), JSON.stringify(badTrig));
+
+  const coreMod = require(path.join(ROOT, 'src', 'core'));
+  const TW = '测试触发词ZZ-' + Date.now();
+  const goodTrig = await nl._execute({ action: 'trigger_add', command: '不用回复：' + TW }, { platform: 'qq', uid: String(cfg.masterQQ) }, '不用回复：' + TW);
+  const added = (coreMod.readTriggers() || []).find(x => (x.words || []).indexOf(TW) >= 0);
+  t('合法触发词照旧能加进去', goodTrig.ok === true && !!added, JSON.stringify(goodTrig));
+  if (added) coreMod.triggerDel(added.id);
+  t('测试加的那条已清掉', !(coreMod.readTriggers() || []).some(x => (x.words || []).indexOf(TW) >= 0));
+
+  t('私聊「根本不是指令」时不再吞消息（handle 返回 handled:false）',
+    /return \{ handled: false, reason: 'not-command' \}/.test(nlSrc) && /if \(!cmd \|\| cmd\.action === 'none'\)/.test(nlSrc));
 
   console.log('\n结果：' + pass + ' 通过 / ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);

@@ -809,6 +809,8 @@ async function runTask(args) {
     if (reason === 'timeout') return _result(false, '', 'timeout', t0, '');
     /* 通道级失败（子进程没了/写不进去/握手失效）→ 同一任务走 headless 重跑一次。 */
     _log(`ACP 任务失败（${reason}：${(e && e.message) || ''}），改走 headless`);
+    // 2026-11-25：这类失败以前只进内存日志，事后查不到源头 → 上报给守望任务
+    try { require('./diag/report').report('agent-link', e && e.message || ('ACP 任务失败：' + reason), { reason, task: key }); } catch (e2) {}
     _killAcp(reason, e && e.message);
     return _runHeadless({ text: text, timeoutMs: timeoutMs, cwd: cwd, t0: t0 });
   }

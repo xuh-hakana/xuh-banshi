@@ -88,7 +88,7 @@ console.log('用例数据：' + pid + ' / qq ' + qq + '（临时目录 ' + TMP +
   const beforeCount = Object.keys(people.load()).length;
   const r = people.setState('p_不存在的人', { name: '幽灵' }, { byUser: true });
   ok('④ 不存在的人物改名字返回失败', r === false, JSON.stringify(r));
-  ok('④ 陌生 QQ 查不到人', !people.findByAccount('qq', '100000000'));
+  ok('④ 陌生 QQ 查不到人', !people.findByAccount('qq', '99999999999'));
   ok('④ 没有凭空多出人物', Object.keys(people.load()).length === beforeCount);
 }
 

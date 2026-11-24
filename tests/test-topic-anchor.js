@@ -36,10 +36,10 @@ const t = (name, ok, why) => {
   t('URL 不在所指里', EXT(nanaShare).indexOf('http') < 0);
   t('别的分享格式（只有链接+文字）也能提取',
     EXT('某人说: 看这个 黑五 Gemini 半价教程 https://v.douyin.com/abc/').indexOf('Gemini') >= 0);
-  t('没有链接的消息 → 空串（不改变行为）', EXT('乙说: 日区先看它自己的黑五页面') === '');
+  t('没有链接的消息 → 空串（不改变行为）', EXT('大肥鱼说: 日区先看它自己的黑五页面') === '');
 
   // ===== ② 引用回复不误认 =====
-  const quoted = 'Neurotic说: ↩回复@Nana：6.64 复制打开抖音，看看【🔥火炏焱📈的图文作品】Gemini4黑五5折$99/年教程。谷歌新↩ @100000000 看完了，不过我在日区';
+  const quoted = 'Neurotic说: ↩回复@Nana：6.64 复制打开抖音，看看【🔥火炏焱📈的图文作品】Gemini4黑五5折$99/年教程。谷歌新↩ @1000001000 看完了，不过我在日区';
   t('引用回复里的旧文案不算话题开头', EXT(quoted) === '', '得到：' + EXT(quoted));
   t('原分享仍算话题开头', EXT(nanaShare) === want);
 
@@ -48,9 +48,9 @@ const t = (name, ok, why) => {
   const kPrivate = 'qq_私聊_test-anchor';
   for (const k of [kGroup, kPrivate]) {
     core.history.set(k, []);
-    core.pushHist(k, 'user', nanaShare, { nick: 'NaNa', uid: '100000000' });
-    core.pushHist(k, 'user', '乙说: 日区先看它自己的黑五页面', { nick: '乙', uid: '100000000' });
-    core.pushHist(k, 'user', 'Neurotic说: 看评论说27号全量', { nick: 'Neurotic', uid: '100000000' });
+    core.pushHist(k, 'user', nanaShare, { nick: 'NaNa', uid: '1000001000' });
+    core.pushHist(k, 'user', '大肥鱼说: 日区先看它自己的黑五页面', { nick: '大肥鱼', uid: '1000001001' });
+    core.pushHist(k, 'user', 'Neurotic说: 看评论说27号全量', { nick: 'Neurotic', uid: '1000001002' });
     t((k.indexOf('私') >= 0 ? '私聊' : '群聊') + ' 从历史回溯到所指', core.topicReferent(k) === want, '得到：' + core.topicReferent(k));
   }
 

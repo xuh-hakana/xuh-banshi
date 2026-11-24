@@ -248,14 +248,11 @@ function banshiTotals(banshiDir, day, cfg) {
   return out;
 }
 function movePoopTotals(dataDir, day) {
-  const rows = readJSONL(path.join(dataDir, 'move-poop-stats.jsonl')).filter(o => inRange(o && o.t, day));
-  const srcs = new Set(), mids = new Set(), tgts = new Set(), per = {};
-  for (const r of rows) {
-    if (r.sourceGroup) srcs.add(String(r.sourceGroup));
-    if (r.mid) mids.add(String(r.mid));
-    if (r.targetGroup) { tgts.add(String(r.targetGroup)); per[r.targetGroup] = (per[r.targetGroup] || 0) + 1; }
-  }
-  return { sourceGroups: srcs.size, sourceMsgs: mids.size, targetGroups: tgts.size, perGroup: per };
+  // 流水口径统一在 src/poop-stats.js：面板/两个客户端/日报读的是同一份解析结果
+  return require('./poop-stats').forwardTotals({
+    statsFile: path.join(dataDir, 'move-poop-stats.jsonl'),
+    day: day,
+  });
 }
 function mergeShi(b, m) {
   const per = Object.assign({}, b.perGroup);

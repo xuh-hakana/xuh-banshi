@@ -197,7 +197,7 @@ def main():
         '    "spare_trigger_max": 8,\n'
         '    "spare_trigger_cooldown_seconds": 30,\n'
         '    "spare_blocked_skip_normal": True,\n'
-        '    "spare_blocked_log": "/Volumes/980/xuhuan mac/xuhbot/src/data/bili-blocked-images.json",\n',
+        '    "spare_blocked_log": "./src/data/bili-blocked-images.json",\n',
     ), (
         "        self._lane_busy = set()\n",
         "        self._lane_busy = set()\n"
@@ -378,7 +378,7 @@ def main():
         '  "spare_trigger_max": {\n    "type": "int",\n    "default": 8,\n    "description": "关键词点图一次最多发几条（队列条目）"\n  },\n'
         '  "spare_trigger_cooldown_seconds": {\n    "type": "int",\n    "default": 30,\n    "description": "同一个群两次关键词点图的最小间隔（秒）"\n  },\n'
         '  "spare_blocked_skip_normal": {\n    "type": "bool",\n    "default": true,\n    "description": "被 B站筛掉的图不参与正常搬屎转发，只留给关键词点图"\n  },\n'
-        '  "spare_blocked_log": {\n    "type": "string",\n    "default": "/Volumes/980/xuhuan mac/xuhbot/src/data/bili-blocked-images.json",\n    "description": "xuhbot 写的被筛图台账路径（本插件只读）"\n  },\n'
+        '  "spare_blocked_log": {\n    "type": "string",\n    "default": "./src/data/bili-blocked-images.json",\n    "description": "xuhbot 写的被筛图台账路径（本插件只读）"\n  },\n'
         '  "queue_max_age_minutes": {\n',
     )])
 

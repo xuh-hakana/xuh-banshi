@@ -1,0 +1,160 @@
+{
+  "note": "人设层清单（2026-11-25）。物理文件与 F/H/D 分区不动，只在这里声明：哪一层、哪些文件、给谁用、什么场景注入。改层先改这里。",
+  "layers": {
+    "F": {
+      "name": "全场景通用主人设",
+      "dir": "soul/F-全场景通用主人设",
+      "always": true,
+      "files": [
+        "虚幻.md",
+        "0-我的喜好.md",
+        "1-性格.md",
+        "2-说话.md",
+        "功能词典.md",
+        "3-接龙结束词.md"
+      ],
+      "inject": "常驻：所有场景、所有模型都读（core.readSoul）"
+    },
+    "H": {
+      "name": "全聊天应对语气",
+      "dir": "soul/H-全聊天",
+      "always": true,
+      "files": [
+        "3-应对.md"
+      ],
+      "inject": "「公共」块常驻；「我/别人」按说话人挑；场合文件命中才注入"
+    },
+    "D": {
+      "name": "平台功能",
+      "dir": "soul/D-平台功能",
+      "always": false,
+      "files": [
+        "空间评论写法.md"
+      ],
+      "inject": "只给对应平台功能用，不进聊天主链路"
+    }
+  },
+  "scenes": [
+    {
+      "id": "me-praise",
+      "label": "被夸",
+      "file": "我-被夸.md",
+      "who": "我",
+      "words": [
+        "夸",
+        "厉害",
+        "牛逼",
+        "自豪",
+        "骄傲",
+        "幸好",
+        "还好没",
+        "没发生就好",
+        "躲过去",
+        "好棒"
+      ]
+    },
+    {
+      "id": "me-blame",
+      "label": "被怪",
+      "file": "我-被怪.md",
+      "who": "我",
+      "words": [
+        "你怎么这么说",
+        "说得真难听",
+        "你这话",
+        "太过分",
+        "伤到",
+        "惹毛",
+        "别这么说话"
+      ]
+    },
+    {
+      "id": "other-watch",
+      "label": "被围观",
+      "file": "别人-被围观.md",
+      "who": "别人",
+      "words": [
+        "机器人",
+        "AI",
+        "幽灵",
+        "好假",
+        "演起来",
+        "围观",
+        "这机器人"
+      ]
+    },
+    {
+      "id": "any-asked",
+      "label": "被提问",
+      "file": "被提问-被需要.md",
+      "both": true,
+      "words": [
+        "问一下",
+        "请教",
+        "想问",
+        "问问你",
+        "能不能帮我",
+        "你知道",
+        "你懂",
+        "咋办",
+        "怎么办",
+        "为什么",
+        "为啥",
+        "怎么样",
+        "哪个好",
+        "哪里"
+      ]
+    },
+    {
+      "id": "any-taught",
+      "label": "被教会",
+      "file": "被教会-学到了.md",
+      "both": true,
+      "words": [
+        "我教你",
+        "教你",
+        "告诉你",
+        "跟你说",
+        "你记一下",
+        "记住",
+        "应该是",
+        "正确答案是",
+        "科普一下",
+        "你记着",
+        "学到了",
+        "涨知识"
+      ]
+    }
+  ],
+  "roles": {
+    "reply": {
+      "desc": "回话 agent：完整虚幻人设（F+H），按场景注入",
+      "layers": [
+        "F",
+        "H"
+      ],
+      "scenes": true
+    },
+    "judge": {
+      "desc": "接话判断：只判回不回、回谁，不带人设正文（省 token）",
+      "layers": [],
+      "scenes": false,
+      "prompt": "你是接话判断器。只输出 JSON：{reply, focusUid, why, urgency}。不要复述人设、不要写回复正文。"
+    },
+    "groupmate": {
+      "desc": "群友视角子 agent：只拿该群友的资料与发言风格，扮演他猜别人想法",
+      "layers": [],
+      "scenes": false,
+      "prompt": "你在扮演下面这个群成员本人（不是机器人）。只用他的口吻和视角，猜这轮每个人想干什么、他会怎么回。只输出 JSON。"
+    },
+    "recorder": {
+      "desc": "记录 agent：判情绪、抽各层级信息点、决定记什么",
+      "layers": [],
+      "scenes": false,
+      "prompt": "你是记录员。只输出 JSON：{emotions, layers, memories[{kind,text,owner}], canOffer, mustNot, replyTarget}。kind 只用 约定/教学/任务/喜好/事实。"
+    }
+  },
+  "routing": {
+    "note": "人设按「模式+槽位」路由（core.resolvePersona）：本地优先且本地槽用 config/local_priority_local_persona.json；本地优先其它槽用 config/local-persona.json；其余走默认 soul。本清单不改这套优先级，只声明默认 soul 的组成。"
+  }
+}

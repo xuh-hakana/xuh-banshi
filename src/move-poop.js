@@ -231,7 +231,7 @@ async function tick() {
           const sc = cur.mode === 'plain' ? '' : '（好评 ' + good + ' / 差评 ' + bad + '）';
           console.log('[搬屎] 已把 ' + id + ' 搬到群 ' + target + sc);
           await new Promise(r => setTimeout(r, 1000));   // 每条间隔 1 秒，防刷屏
-        } catch (e) { console.log('[搬屎] 搬到群 ' + target + ' 失败：' + e.message); }
+        } catch (e) { console.log('[搬屎] 搬到群 ' + target + ' 失败：' + e.message); try { require('./err-log.js').logErr('poop-forward', '搬到群失败', { group: target, msg: e.message }); } catch (e2) {} }
       }
       delete cache[id]; saveCache();
       if (sent) {
@@ -261,7 +261,7 @@ function start(opts) {
   const schedule = () => {
     if (!running) return;
     timer = setTimeout(() => {
-      tick().catch(e => console.log('[搬屎] tick 出错：' + e.message)).finally(schedule);
+      tick().catch(e => { console.log('[搬屎] tick 出错：' + e.message); try { require('./err-log.js').logErr('poop-tick', 'tick 出错', { msg: e.message }); } catch (e2) {} }).finally(schedule);
     }, pollMs());
   };
   schedule();

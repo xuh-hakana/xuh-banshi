@@ -13,7 +13,7 @@
  *   说话方式类（句尾/称呼/语气）继续走 core.pactOf / pactAdd，本模块不碰、不改 onlyRules。
  *   「碰到 X 就回 Y」这类场景约定也留在 topics.jsonl；这里只给它们打 dir 展示，不复制数据。
  *
- * 免记录群（noRecordGroups，如赛博鱼塘②塘 100000000）：教学照常落盘。
+ * 免记录群（noRecordGroups，如赛博鱼塘②塘 143620228）：教学照常落盘。
  *   core.topicAdd 的 kind=promise 拦截、qq.js 的 !noRec 都不经过这里。
  */
 const fs = require('fs');

@@ -1,14 +1,38 @@
 {
   "name": "xuhbot",
-  "version": "0.2.0",
-  "private": true,
+  "version": "0.4.0",
+  "private": false,
   "description": "虚幻 — QQ 陪伴机器人（NapCat + OneBot 11 + LLM），含管理面板与桌面客户端",
   "main": "src/bot.js",
+  "author": "虚幻 (xuh-hakana)",
+  "license": "MIT",
+  "homepage": "https://github.com/xuh-hakana/xuhbot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xuh-hakana/xuhbot.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "qq-bot",
+    "onebot",
+    "napcat",
+    "llm",
+    "sticker",
+    "nsfw-filter"
+  ],
   "scripts": {
+    "start": "node src/bot.js",
+    "prestart": "node scripts/init-config.js",
+    "init": "node scripts/init-config.js",
+    "pack:public": "node scripts/pack-public.js",
+    "pack:win": "node scripts/pack-win.js",
+    "scan:secrets": "node scripts/scan-secrets.js",
     "bot": "node src/bot.js",
     "panel": "node src/server/panel.js",
     "client": "electron app",
-    "test": "cd src && node ../tests/test-all.js && node ../tests/test-person-save.js && node ../tests/test-call-names.js && node ../tests/test-role.js && node ../tests/test-video.js && node ../tests/test-bili-censor.js && node ../tests/test-bili-publisher.js && node ../tests/test-bili-blocked.js && node ../tests/test-bili-porn-block.js && node ../tests/test-daily-stats.js",
+    "test": "cd src && node ../tests/test-all.js && node ../tests/test-person-save.js && node ../tests/test-call-names.js && node ../tests/test-role.js && node ../tests/test-video.js && node ../tests/test-bili-censor.js && node ../tests/test-bili-publisher.js && node ../tests/test-bili-blocked.js && node ../tests/test-bili-porn-block.js && node ../tests/test-daily-stats.js && node ../tests/test-media-dedupe.js && node ../tests/test-mediagen.js",
     "test:person-save": "node tests/test-person-save.js",
     "build:human": "node scripts/build-human.js",
     "bot:any": "bash scripts/node.sh src/bot.js",
@@ -16,7 +40,11 @@
     "test:any": "bash scripts/node.sh tests/test-all.js",
     "test:daily-stats": "node tests/test-daily-stats.js",
     "test:mem": "bash scripts/node.sh tests/test-img-cache.js",
-    "bench:img": "bash scripts/node.sh scripts/mem-bench.js"
+    "bench:img": "bash scripts/node.sh scripts/mem-bench.js",
+    "video": "node scripts/video-factory.js",
+    "video:setup": "node scripts/setup-video.js",
+    "video:check": "node scripts/setup-video.js --check",
+    "test:mediagen": "node tests/test-mediagen.js"
   },
   "dependencies": {
     "bilibili-live-ws": "^6.3.1",

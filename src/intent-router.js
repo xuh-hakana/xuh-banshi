@@ -52,6 +52,9 @@ function conf() {
     enabled: src.enabled !== false,
     whitelistFavor: num(src.whitelistFavor, 100),
     agentTurnOnHit: src.agentTurnOnHit !== false,
+    // 深度私聊派给 dsh agent（2026-11-25）：主人私聊的长思辨题不 @ 也派，
+    // 由 DSH 的子 agent 各自带人设分视角答。置 false 可整条关掉。
+    deepAsk: src.deepAsk !== false,
     words: { search: list(words.search), calc: list(words.calc), negate: list(words.negate) },
   };
 }
@@ -69,6 +72,13 @@ function hitOf(text, list) {
  * 返回 { action:'work'|'chat', reason, hit }
  * 任何异常 → chat（宁可不派，不能把闲聊送去干活）。
  */
+/* 深度私聊判据：够长 + 带思辨/推理词。放在 gate 上面，便于单独测。 */
+const DEEP_WORDS = /(为什么|怎么理解|是不是|会不会|如果|假设|推理|真相|理论|观点|有没有|该怎么)/;
+function isDeepAsk(text) {
+  const s = String(text || '').trim();
+  return s.length >= 80 && DEEP_WORDS.test(s);
+}
+
 function gate(text, opts) {
   const o = opts || {};
   let c;
@@ -80,10 +90,14 @@ function gate(text, opts) {
     return { action, reason, hit: hit || '' };
   };
   if (!c.enabled) return out('chat', 'disabled');
-  if (!o.atMe) return out('chat', 'no-at');                       // 没 @ 她：一律不派
-  if (Number(o.favor) < c.whitelistFavor) return out('chat', 'not-white');
   const t = String(text || '');
   if (!t.trim()) return out('chat', 'empty');
+  /* 深度私聊（2026-11-25）：主人私聊里的长思辨题（「四层真相」那种）不 @ 也交给 dsh agent，
+   * 让子 agent 各自带人设分视角推理。判据三条同时成立：私聊 + 主人 + 够长且带思辨词。
+   * 普通长句、带图、引用都不走这条（qq.js 传进来的 quoted/hasImg 不看，这里只管文本长度与词）。 */
+  if (c.deepAsk && o.isPrivate && o.isMaster && isDeepAsk(t)) return out('work', 'deep-ask');
+  if (!o.atMe) return out('chat', 'no-at');                       // 没 @ 她：一律不派
+  if (Number(o.favor) < c.whitelistFavor) return out('chat', 'not-white');
   const neg = hitOf(t, c.words.negate);
   if (neg) return out('chat', 'negate:' + neg);
   const hit = hitOf(t, c.words.search) || hitOf(t, c.words.calc);

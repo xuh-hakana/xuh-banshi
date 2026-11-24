@@ -16,7 +16,7 @@
  *          记豁免 = 以后自动判定一律绕开这个号，面板再「标记 AI」才会重新标。
  *
  * 分档（主人 2026-11-21 原话，t3 是笔误，实际只有 t0/t1/t2）：
- *   t0：「乙」「小肥鱼」「ai」「bot」—— 绝对是 AI，直接标，不私信
+ *   t0：「大肥鱼」「小肥鱼」「ai」「bot」—— 绝对是 AI，直接标，不私信
  *   t1：「鲸」「🐳」「🐟」「鱼」「饭」「家的」—— 小概率误判，标 + 看注册时间（新号不报，老号才报）
  *   t2：「家」                          —— 中概率误判，标 + 私信
  *   （2026-11-21 07:36 主人令：「的」从 t2 移除——「的」字人人都有，误标太狠。）
@@ -27,7 +27,7 @@ const path = require('path');
 
 const FILE = path.join(__dirname, 'data', 'ai-marks.json');
 
-const T0 = ['乙', '小肥鱼', 'ai', 'bot'];
+const T0 = ['大肥鱼', '小肥鱼', 'ai', 'bot'];
 const T1 = ['鲸', '🐳', '🐟', '鱼', '饭', '家的'];
 const T2 = ['家'];
 const RANK = { t0: 3, t1: 2, t2: 1 };
@@ -67,7 +67,7 @@ function yearOfReg(regTime) {
 }
 
 /* 判一个名字属于哪一档；没命中返回 null。
- * 顺序固定 t0 → t1 → t2：先把「乙 / 小肥鱼」这种 t0 认掉，不让它被 t1 的「鱼」抢走。 */
+ * 顺序固定 t0 → t1 → t2：先把「大肥鱼 / 小肥鱼」这种 t0 认掉，不让它被 t1 的「鱼」抢走。 */
 function classifyName(name) {
   const s = String(name == null ? '' : name).trim().toLowerCase();
   if (!s) return null;
@@ -81,7 +81,7 @@ function classifyName(name) {
  * 再看主页的签名 / 简介 / 置顶帖 / 视频或直播间标题等内容；二重也中 → 当 t0，不私信。
  * 只认明确的 AI 标识（t0 强词 + AI 特征词），不拿 t1/t2 的宽泛词——不然「的」「家」在简介里
  * 必然出现，等于人人都是 AI。返回 't0' 或 ''。 */
-const AI_HOME_WORDS = ['乙', '小肥鱼', '机器人', '虚拟主播', '虚拟形象', 'ai绘画', 'ai生成', 'aigc', 'gpt', 'claude', '大模型', '自动回复', 'bot'];
+const AI_HOME_WORDS = ['大肥鱼', '小肥鱼', '机器人', '虚拟主播', '虚拟形象', 'ai绘画', 'ai生成', 'aigc', 'gpt', 'claude', '大模型', '自动回复', 'bot'];
 function classifyHomeText(text) {
   const s = String(text == null ? '' : text).toLowerCase();
   if (!s) return '';

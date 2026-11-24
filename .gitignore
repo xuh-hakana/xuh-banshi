@@ -1,0 +1,39 @@
+# 依赖与产物
+node_modules/
+dist/
+*.tmp
+.tmp/
+
+# 运行时数据（表情包 / 图库 / 聊天记录 / 花费账本 / 模型）：一律不进仓库
+src/data/*
+!src/data/README.md
+!src/data/.gitkeep
+data/
+
+# 配置：只提交模板
+src/config/*.json
+!src/config/*.example.json
+
+# 人设记忆（私人物料）
+src/persona/1-人设正文/
+src/persona/6-记忆数据/
+
+# 本机专用
+.env
+*.log
+日志/
+.DS_Store
+虚幻.app/
+*.app/Contents/Frameworks/
+备份/
+总备份/
+工具/
+file/
+handover/
+_备份/
+WorkBuddy*.txt
+设计稿-游戏感面板.html
+
+# 色图标定集与改判（样本归作者自己留）
+src/data/porn-refs/
+src/data/porn-overrides.json

@@ -26,9 +26,9 @@ const core = require(CORE);
 const cfg = require(path.join(ROOT, 'src', 'config')).load();
 core.init(cfg);
 
-const BAI = '100000000';        // 白
-const HD = '100000000';          // 企鹅火丁
-const MASTER = '100000000';
+const BAI = '1000001000';        // 白
+const HD = '1000001001';          // 企鹅火丁
+const MASTER = '1000001002';
 
 let pass = 0, fail = 0;
 const t = (name, cond, extra) => {
@@ -57,7 +57,7 @@ try {
 
   /* ---------- 2. 命中：那一长串每一条都算 ---------- */
   console.log('[命中]');
-  // 键现在是 'platform:id'（qq:100000000），不再拿裸号硬比对——按 topic 找，
+  // 键现在是 'platform:id'（qq:1000001000），不再拿裸号硬比对——按 topic 找，
   // 归属对不对由下面「白白两个号读同一份」「别人拿不到」那几项去验。
   const p = core.pactParts(core.readPromises().find(x => x.qq && /白的约定/.test(String(x.topic))) || {});
   t('约定里存了整串条件（≥15 条）', (p.when || []).length >= 15, (p.when || []).length + ' 条');
@@ -78,7 +78,7 @@ try {
   t('火丁：注入完整 Ciallo（～ 和 ∠・ω< 都在）', hdLine.includes('Ciallo～(∠・ω< )⌒☆'), hdLine);
   t('火丁：注入里不带「不许改不许省」', !/一个都不许改/.test(hdLine), hdLine);
 
-  t('约定不串人：凑肥鱼没有白的', core.pactLines('100000000', { text: '何意味？' }) === '');
+  t('约定不串人：凑肥鱼没有白的', core.pactLines('1000001003', { text: '何意味？' }) === '');
 
   /* ---------- 4. 发送层：剥别人的记号，别剥自己的话 ---------- */
   console.log('[发送层]');
@@ -100,7 +100,7 @@ try {
 
   /* ---------- 6. 落盘：新约定自动带上拆好的字段 ---------- */
   console.log('[落盘]');
-  const TMP = '100000000';
+  const TMP = '1000001004';
   const it = core.pactAdd(TMP, '自测小人', '碰到测试词就回一句「测试话！」', '自测', { when: ['测试词'] });
   t('pactAdd 落盘成功', !!it && it.kind === 'promise');
   t('落盘带 say（含标点）', it && it.say === '测试话！', it && JSON.stringify(it.say));
@@ -108,10 +108,10 @@ try {
   t('场景类落盘 sig 为空', it && it.sig === '');
 
   /* ---------- 7. 全平台：同一个人 QQ / B站 两头共用一份约定 ----------
-   * 她原话（2026-11-06）：「100000000 白的b站。请保证约定和喜好等等都是全平台生效」。
+   * 她原话（2026-11-06）：「1000001005 白的b站。请保证约定和喜好等等都是全平台生效」。
    * 造一个临时人物 + 两个账号来测，不动真实的人；跑完还原 people.json。 */
   console.log('[全平台]');
-  const TMPQ = '100000000', TMPB = '100000000';
+  const TMPQ = '1000001006', TMPB = '1000001007';
   const people = require(path.join(ROOT, 'src', 'people'));
   const pid = people.ensure('qq', TMPQ, { nick: '自测甲' });
   people.addAccount(pid, 'bili', TMPB);
@@ -143,12 +143,12 @@ try {
 
   // 真实档案（白）：QQ 定的「够童」在 B站 侧也命中；别人的约定不许串过来
   t('白的 QQ 约定在 B站 号上命中',
-    core.pactLines('bili:100000000', { text: '何意味？' }).includes('够童！'));
+    core.pactLines('bili:1000001005', { text: '何意味？' }).includes('够童！'));
   t('白的两个号读到同一份（QQ / B站 输出一致）',
-    core.pactLines('bili:100000000') === core.pactLines(BAI));
+    core.pactLines('bili:1000001005') === core.pactLines(BAI));
   t('B站 号也不串火丁的记号',
-    !core.stripOtherPacts('Ciallo～(∠・ω< )⌒☆', 'bili:100000000').includes('Ciallo'));
-  t('白的记号在 B站 侧不被剥', core.stripOtherPacts('够童！', 'bili:100000000') === '够童！');
+    !core.stripOtherPacts('Ciallo～(∠・ω< )⌒☆', 'bili:1000001005').includes('Ciallo'));
+  t('白的记号在 B站 侧不被剥', core.stripOtherPacts('够童！', 'bili:1000001005') === '够童！');
 
   /* ---------- 8. 以后加平台（小红书 / 抖音 / 小黑盒）不能有问题 ----------
    * 她原话（2026-11-06）：「后续增加小红书抖音小黑盒平台都不能有问题」。
@@ -165,7 +165,7 @@ try {
     && core.pactLines('bili:' + TMPB, { text: '自测小红书' }).includes('小红书好！')
     && core.pactLines('douyin:' + DY, { text: '自测小红书' }).includes('小红书好！'));
   t('一条约定只认自己那个人（小红书号没串到别人）',
-    !core.pactLines('qq:100000000', { text: '自测小红书' }).includes('小红书好！'));
+    !core.pactLines('qq:1000001003', { text: '自测小红书' }).includes('小红书好！'));
   // 档案里有的号按档案认平台；档案里没有、又带字母的，不许猜成 QQ（猜错会把小红书号写成 qq:xxx）
   t('档案里的号按档案认平台', people.keyOf(XHS) === 'xhs:' + XHS, people.keyOf(XHS));
   t('查不到的字母裸号不冒充 QQ',

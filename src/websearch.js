@@ -1,104 +1,21 @@
 /*
- * websearch.js — 查资料：免费链优先，付费智谱只做兜底（2026-11-07 主人定：付费的用不起，只能兜底）
- * 顺序：本地知识（core.js 先跑 guides.search）→ 免 Key 官方 API（PokeAPI / 萌娘百科）
- *       → 免费抓页 Bing → 以上全没结果、且 webSearch.paidFallback=true 时才打智谱（0.01 元/次）。
- * 默认 paidFallback 关：一次查询 0 元。付费代码保留不删，只改调用顺序。
+ * websearch.js — 查资料：全免费链路，不含任何付费接口（2026-11-23 主人令「付费都删、免费保留」）
+ * 顺序：本地知识（core.js 先跑 guides.search）→ 宝可梦/PokeAPI → 萌娘百科 → 维基百科
+ *       → 通用网页源 Brave → Google CSE → SearXNG → AnySearch（匿名，免 Key，默认开）→ 抓页 Bing（默认关）。
  * 只负责「搜 + 摘录 + 判断结果相不相关」，不负责判断要不要搜（由 core 决定）。
- * 搜索源与免费额度按类登记在文件中部的 PROVIDERS（2026-11-22 逐条核实，出错处与正确值都写在 note 里；
- * 出处见 docs/搜索源核实表.md）。要 Key 的源一律只登记不调用，当前只接 AnySearch（匿名）与 SearXNG。
- * 通用链路：Brave → Google CSE → SearXNG → AnySearch，前一家没结果才轮到下一家。
+ * 搜索源与免费额度按类登记在 src/websearch-providers.js（2026-11-22 逐条核实，出错处与正确值都写在 note 里；
+ * 出处见 docs/搜索源核实表.md）。要 Key 的源只登记不调用；无 Key 源 2026-11-23 按主人令撤除。
+ * 通用链路：Brave → Google CSE → SearXNG，前一家没结果才轮到下一家。
  */
-const fs = require('fs');
-const path = require('path');
-const ROOT = __dirname;
 const configStore = require('./config');   // 配置统一入口：从 config/ 四个分区读取
 const pokemon = require('./pokemon');      // 宝可梦专用数据源（0 元、免 Key，见 pokemon.js 顶部说明）
 const guides = require('./guides');        // 学到的.md 真写盘：官方直取结果自动沉淀，下次不用再联网
 const knowledge = require('./knowledge');  // 维基百科 / Wikidata 官方 API（走代理，0 元 0 Key，2026-11-07 加）
-/* ===== 搜索源注册表（2026-11-22 逐条核实；出处与实测见 docs/搜索源核实表.md）=====
- * 分类 cat：api=有免费额度的 Key 制 API｜nokey=零配置免 Key｜selfhost=自托管｜github=参考项目
- * verified：✅核实（官网原文如此）｜⚠️部分（说法与官网有出入，note 里写正确值）｜❌不实（说法错）｜⛔失效
- * usable：当前代码是否真的能调它。只接 needKey==='none' 且实测通的源；要 Key 的一律只登记不调用。
- * 额度随时会变，每条都带 source，别删出处。改额度前先去官网复核。 */
-const PROVIDERS = [
-  // —— ① 有免费额度的 Key 制 API（不接：要 Key，0 元红线之外）——
-  { id: 'tavily', name: 'Tavily', cat: 'api', needKey: 'required', usable: false, verified: '✅核实',
-    quota: '1,000 credits/月（basic 搜索 1 credit/次 ≈1,000 次；advanced 2 credits/次 = 500 次）',
-    source: 'https://docs.tavily.com/documentation/api-credits',
-    note: '免信用卡，每月重置。方案里的「1,000 次/月」基本准确，但 advanced 会翻倍扣。' },
-  { id: 'exa', name: 'Exa', cat: 'api', needKey: 'required', usable: false, verified: '❌不实',
-    quota: '每月 $10 信用额度（每月 1 号重置）≈ 2,500 次 Lite 搜索（$4/1k）',
-    source: 'https://exa.ai/docs/reference/pricing',
-    note: '不是「1,000 次/月」。按美元额度算，搜索深度不同扣费不同。' },
-  { id: 'websearchapi', name: 'WebSearchAPI.ai', cat: 'api', needKey: 'required', usable: false, verified: '✅核实',
-    quota: '2,000 search credits/月（Free 档，$0/月）',
-    source: 'https://websearchapi.ai/pricing',
-    note: '和方案一致。1 credit ≠ 1 次，深度检索会多扣。' },
-  { id: 'serper', name: 'Serper', cat: 'api', needKey: 'required', usable: false, verified: '❌不实',
-    quota: '注册一次性 2,500 次，不按月重置、用完即止',
-    source: 'https://serper.dev/',
-    note: '官网只写「Get 2,500 free queries」，没有任何每月恢复。' },
-  { id: 'brave', name: 'Brave Search API', cat: 'api', needKey: 'required', usable: true, verified: '⚠️部分',
-    quota: '免费档每月最多 $20 调用额度（旧注释「2,000 次/月」是旧价目，已不准确）',
-    source: 'https://brave.com/search/api/',
-    note: '代码里已在用（ws.braveKey）；额度按美元折算，1 次查询约 $0.005 上下。' },
-  { id: 'googlecse', name: 'Google CSE', cat: 'api', needKey: 'required', usable: true, verified: '✅核实',
-    quota: '100 次/日（Custom Search JSON API 免费层）',
-    source: 'https://developers.google.com/custom-search/v1/overview',
-    note: '代码里已在用（ws.googleKey + ws.googleCx）。' },
-  { id: 'youcom', name: 'You.com', cat: 'api', needKey: 'none', usable: false, verified: '⚠️部分',
-    quota: '免费档 100 次/日，无 Key、无账号、无信用卡 —— 但只走 MCP 通道',
-    source: 'https://you.com/pricing',
-    note: '没有直连 REST 的免 Key 端点，本仓库没有 MCP 客户端，所以不接。' },
+const { PROVIDERS, listProviders } = require('./websearch-providers');   // 源清单与核实数据（纯数据，改额度不动逻辑）
 
-  // —— ② 零配置免 Key（能接的都接了）——
-  { id: 'anysearch', name: 'AnySearch', cat: 'nokey', needKey: 'none', usable: true, verified: '✅核实',
-    quota: '匿名 1,000 次/日（按 IP 限流，10 QPS）；带 Key 走付费额度',
-    source: 'https://www.anysearch.com/docs/auth',
-    note: 'POST https://api.anysearch.com/v1/search，不带 Authorization 就是匿名档。2026-11-22 本机实测 200 有结果。' },
-  { id: 'marginalia', name: 'Marginalia', cat: 'nokey', needKey: 'required', usable: false, verified: '⚠️部分',
-    quota: '要 API-Key 头；开发可用公共 key「public」，但限流、不能自定义过滤',
-    source: 'https://about.marginalia-search.com/article/api/',
-    note: '不是「无密钥端点」。2026-11-22 实测公共 key 直接 429 QPM Limit Exceeded。' },
-  { id: 'duckduckgo', name: 'DuckDuckGo', cat: 'nokey', needKey: 'none', usable: false, verified: '❌不实',
-    quota: 'Instant Answer API 只返回摘要/话题，不是网页搜索结果',
-    source: 'https://duckduckgo.com/api',
-    note: '想拿网页结果只能抓 html/lite 端点 —— 那是对抗性抓页（2026-11-07 红线），不接。' },
-  { id: 'firecrawl', name: 'Firecrawl', cat: 'nokey', needKey: 'required', usable: false, verified: '❌不实',
-    quota: '免费档 1,000 credits/月（≈500 次搜索），/v2/search 必须带 API Key',
-    source: 'https://www.firecrawl.dev/pricing',
-    note: '「/v2/search 无需 Key」不成立，匿名调用会 401。' },
-
-  // —— ③ 自托管（完全免费，但要自己跑进程）——
-  { id: 'searxng', name: 'SearXNG', cat: 'selfhost', needKey: 'none', usable: true, verified: '✅核实',
-    quota: '自建不限量、无 Key；但 settings.yml 默认 formats 只有 html，必须加 json 才有 JSON 接口',
-    source: 'https://docs.searxng.org/admin/settings/settings_search.html',
-    note: '代码里已接（ws.searxUrl，如 http://127.0.0.1:8888）。内存「约 200MB」未实测，不写进结论。' },
-  { id: 'crw', name: 'CRW (fastcrw/crw)', cat: 'selfhost', needKey: 'none', usable: false, verified: '✅核实',
-    quota: '本地 Rust 二进制，免费、免账号；云版 1,000 免费 credits',
-    source: 'https://github.com/fastcrw/crw',
-    note: '是本地进程/MCP 工具，不是本仓库能直接 fetch 的 REST；要用得单独部署。' },
-  { id: 'infomesh', name: 'InfoMesh', cat: 'selfhost', needKey: 'none', usable: false, verified: '✅核实',
-    quota: 'P2P 网络，永久免费无上限，但必须跑自己的节点',
-    source: 'https://github.com/dotnetpower/infomesh',
-    note: '只有 Python MCP 包（pip install infomesh），没有公开 REST；不接。' },
-
-  // —— ④ GitHub 参考项目（只登记，不当数据源）——
-  { id: 'searxng-rest', name: 'pratyay360/searchapi', cat: 'github', needKey: 'none', usable: false, verified: '✅核实',
-    quota: 'SearXNG 驱动的可部署 REST 封装，免费', source: 'https://github.com/pratyay360/searchapi',
-    note: '等于把 SearXNG 包一层 HTTP，本仓库已有 searxUrl，不必再套。' },
-  { id: 'search-mcp', name: 'denysvitali/search-mcp', cat: 'github', needKey: 'required', usable: false, verified: '✅核实',
-    quota: 'Tavily 的 MCP 封装，额度沿用 Tavily', source: 'https://github.com/denysvitali/search-mcp',
-    note: '仓库真实存在，但不是免 Key 方案。' },
-];
-
-// 当前生效的免 Key 源（只这些会被 generalWeb 调用）
-const USE_ANYSEARCH = ws => ws.anysearch !== false;   // AnySearch 匿名：默认开
-const ENDPOINT = 'https://open.bigmodel.cn/api/paas/v4/web_search';
 const cache = new Map();      // query -> {t, text}   成功缓存 10 分钟
 const failCache = new Map();  // query -> 失败时间     失败缓存 60 秒（免得每条消息都重付一次注定失败的往返）
 const inflight = new Map();   // query -> Promise     同一查询并发只发一次
-let wsDeadUntil = 0;          // 智谱搜索额度用完（429/1113）→ 这段时间直接走免费兜底，不再白撞
 
 function cfg() {
   try {
@@ -108,9 +25,9 @@ function cfg() {
 }
 
 async function search(query) {
-  const { ws, llm } = cfg();
+  const { ws } = cfg();
   if (ws.enabled === false) return '';
-  // 免费链不需要 key；只有付费兜底才检查 llm.apiKey（见 paidSearch）
+  // 全免费链，不需要任何 key；ws.enabled===false 才整条关掉
   const q = String(query || '').slice(0, 70);
   if (!q) return '';
 
@@ -124,15 +41,11 @@ async function search(query) {
 
   const p = (async () => {
     try {
-      // 免费链先跑（0 元）：免 Key 官方 API → 免费抓页。付费智谱只在全空且开关打开时才碰。
+      // 全免费链：官方免 Key API（宝可梦/萌娘/维基）→ 通用网页源（含 AnySearch 匿名）→ 抓页。
       const free = await freeFallback(q, ws);
       const miss = !!free && /^（联网查过了/.test(free);   // 这是「查过了但没查到」的说明，不是答案
       if (free && !miss) { failCache.delete(q); return free; }
 
-      if (ws.paidFallback === true && llm.apiKey) {
-        const paid = await paidSearch(q, ws, llm);
-        if (paid) { failCache.delete(q); return paid; }
-      }
       if (free) { failCache.delete(q); return free; }   // 没查到就照实给方向，不许编
       failCache.set(q, Date.now());
       return '';
@@ -148,10 +61,7 @@ async function search(query) {
   return p;
 }
 
-/* ===== 通用网页搜索（0 元源，2026-11-22 主人令「多配几个全场景的网页、可走代理、不要付费搜索」）=====
- * 顺序：Brave（免费 2000 次/月）→ Google CSE（免费 100 次/日）→ 自建 SearXNG（Docker，不限量）。
- * 三个都只调官方 JSON 接口，不解析 HTML、不伪装 UA（守 2026-11-07 的红线）。
- * 配置在 llm.json 的 webSearch：braveKey / googleKey / googleCx / searxUrl；proxy 沿用现有那套。 */
+// 代理：只给要过墙的官方 API 用（自建 SearXNG 是本机地址，走代理反而绕远）；没配就自动探测。
 async function proxyFor(ws) {
   try {
     if (!ws || !ws.proxy || ws.proxy.enabled === false) return '';
@@ -161,15 +71,24 @@ async function proxyFor(ws) {
   } catch (e) { return ''; }
 }
 
+// 给「查官方数据」这一段封顶：萌娘/维基内部是 9s+9s+8s 三段串行，最坏能把回复卡 20 多秒。
+// 宁可这段没查到（后面还有通用网页源/Bing/交给 agent），也不能让主人干等。
+function withCap(p, ms, fallback) {
+  let tm;
+  const cap = new Promise(r => { tm = setTimeout(() => r(fallback), ms); });
+  return Promise.race([p, cap]).finally(() => clearTimeout(tm));
+}
+
 function fmtHits(hits, limit) {
   return hits.slice(0, limit || 5).map((r, i) =>
     `【${i + 1}】${r.title || ''}\n${(r.content || '').trim()}\n来源：${r.link || ''}`).join('\n\n');
 }
 
-// ===== AnySearch：零配置免 Key 的通用网页搜索（2026-11-22 核实后接入）=====
+
+// ===== AnySearch：零配置免 Key 的通用网页搜索（2026-11-22 核实后接入，2026-11-23 按主人令恢复）=====
 // 匿名模式：不带 Authorization 头就能搜，额度 1,000 次/日、按 IP 限流（docs/auth 原文）。
 // 响应 {data:{results:[{title,url,snippet,content}]}}（docs/api-endpoints/v1-search.md）。
-// POST 要 body，net.js 只有 GET → 用全局 fetch（和 paidSearch 一样，这条不走代理）。
+// POST 要 body，net.js 只有 GET → 用全局 fetch（这条不走代理）。
 let anyDeadUntil = 0;   // 402 额度用完 / 429 限流 → 冷却期内不再敲，别每条消息白撞
 const ANYSEARCH_API = 'https://api.anysearch.com/v1/search';
 
@@ -211,90 +130,59 @@ async function anysearchSearch(q, ws) {
   }
 }
 
+/* ===== 通用网页搜索（0 元官方 API，2026-11-22 加）=====
+ * 顺序：Brave → Google CSE → 自建 SearXNG；三家都只调官方 JSON 接口，不解析 HTML、不伪装 UA（守 2026-11-07 红线）。
+ * 配置在 llm.json 的 webSearch：braveKey / googleKey / googleCx / searxUrl；proxy 沿用现有那套。
+ * 表驱动：加源只往 GENERIC_SOURCES 里加一条，顺序＝数组顺序，前一家没结果才轮到下一家。 */
+const GENERIC_SOURCES = [
+  {
+    id: 'SearXNG',
+    ready: ws => !!ws.searxUrl,
+    async run(q, ws, net, proxy, want, timeout) {
+      const base = String(ws.searxUrl).replace(/\/+$/, '');
+      const j = await net.getJson(base + '/search?format=json&q=' + encodeURIComponent(q), { proxy: '', timeout });
+      return (j.results || []).map(r => ({ title: r.title, content: r.content, link: r.url }));
+    },
+    // 403/格式错基本就一个原因：settings.yml 的 search.formats 默认只有 html，没加 json
+    hint: e => (/403/.test(String(e.message)) ? '（settings.yml 的 formats 要加 json）' : ''),
+  },
+  {
+    id: 'AnySearch',                                  // 零配置免 Key，匿名 1,000 次/日，默认开（ws.anysearch=false 可关）
+    ready: ws => ws.anysearch !== false,
+    async run(q, ws, net, proxy, want) { return anysearchSearch(q, ws); },
+  },
+  {
+    id: 'Mwmbl',                                     // 开放索引、免 Key；索引只有英文网页，中文查询必空
+    ready: ws => ws.mwmbl !== false,
+    async run(q, ws, net, proxy, want) {
+      if (/[\u4e00-\u9fa5]/.test(q)) return [];        // 中文它一次都搜不到，别白等两秒
+      const j = await net.getJson('https://api.mwmbl.org/search?s=' + encodeURIComponent(q), { proxy, timeout: 8000 });
+      return (j || []).map(r => ({
+        title: (r.title || []).map(t => t.value).join(''),
+        content: (r.extract || []).map(t => t.value).join('').slice(0, 300),
+        link: r.url,
+      })).filter(h => h.link);
+    },
+  },
+];
+
 async function generalWeb(q, ws) {
   const net = require('./net');
   const proxy = await proxyFor(ws);
   const timeout = 8000;
   const want = Number(ws.count || 5);
-  // ① Brave
-  if (ws.braveKey) {
+  for (const src of GENERIC_SOURCES) {
+    if (!src.ready(ws)) continue;                      // 没配 key/地址就跳过，不发请求
     try {
-      const u = 'https://api.search.brave.com/res/v1/web/search?count=' + want + '&q=' + encodeURIComponent(q);
-      const j = JSON.parse(await net.getText(u, { proxy, timeout, header: 'X-Subscription-Token: ' + ws.braveKey + '\r\nAccept: application/json' }));
-      const hits = ((j.web && j.web.results) || []).map(r => ({ title: r.title, content: r.description, link: r.url }));
-      if (hits.length) { console.log('[web] Brave 搜到 ' + hits.length + ' 条「' + q + '」'); return fmtHits(hits, want); }
-    } catch (e) { console.log('[web] Brave 失败：' + String(e.message).slice(0, 40)); }
-  }
-  // ② Google CSE
-  if (ws.googleKey && ws.googleCx) {
-    try {
-      const u = 'https://www.googleapis.com/customsearch/v1?key=' + encodeURIComponent(ws.googleKey)
-        + '&cx=' + encodeURIComponent(ws.googleCx) + '&num=' + want + '&q=' + encodeURIComponent(q);
-      const j = await net.getJson(u, { proxy, timeout });
-      const hits = (j.items || []).map(r => ({ title: r.title, content: r.snippet, link: r.link }));
-      if (hits.length) { console.log('[web] Google 搜到 ' + hits.length + ' 条「' + q + '」'); return fmtHits(hits, want); }
-    } catch (e) { console.log('[web] Google 失败：' + String(e.message).slice(0, 40)); }
-  }
-  // ③ 自建 SearXNG（ws.searxUrl，如 http://127.0.0.1:8888）
-  if (ws.searxUrl) {
-    try {
-      const base = String(ws.searxUrl).replace(/\/+$/, '');
-      const j = await net.getJson(base + '/search?format=json&q=' + encodeURIComponent(q), { proxy: '', timeout });
-      const hits = (j.results || []).map(r => ({ title: r.title, content: r.content, link: r.url }));
-      if (hits.length) { console.log('[web] SearXNG 搜到 ' + hits.length + ' 条「' + q + '」'); return fmtHits(hits, want); }
+      const hits = await src.run(q, ws, net, proxy, want, timeout);
+      if (typeof hits === 'string') { if (hits) return hits; continue; }   // 源自己已经排好版（AnySearch 直接给文本）
+      if (hits.length) { console.log('[web] ' + src.id + ' 搜到 ' + hits.length + ' 条「' + q + '」'); return fmtHits(hits, want); }
     } catch (e) {
-      // 403/格式错基本就一个原因：settings.yml 的 search.formats 默认只有 html，没加 json
       const msg = String(e.message).slice(0, 40);
-      console.log('[web] SearXNG 失败：' + msg + (/403/.test(msg) ? '（settings.yml 的 formats 要加 json）' : ''));
+      console.log('[web] ' + src.id + ' 失败：' + msg + (src.hint ? src.hint(e) : ''));
     }
-  }
-  // ④ AnySearch（零配置免 Key，匿名 1,000 次/日；实测通，见 PROVIDERS）
-  if (USE_ANYSEARCH(ws)) {
-    const any = await anysearchSearch(q, ws).catch(() => '');
-    if (any) return any;
   }
   return '';
-}
-
-// 付费兜底：只有 webSearch.paidFallback=true 才会走到这里（0.01 元/次）。
-// 2026-11-07 主人定「用不起，只能兜底」→ 原实现整段保留，只从「第一顺位」挪到「最后一顺位」。
-async function paidSearch(q, ws, llm) {
-  if (Date.now() < wsDeadUntil) return '';   // 额度用完，30 分钟内不白撞
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 6000);
-  try {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${llm.apiKey}` },
-      body: JSON.stringify({
-        search_query: q,
-        search_engine: ws.engine || 'search_std',
-        count: ws.count || 5,
-        content_size: 'medium',
-      }),
-      signal: ctrl.signal,
-    });
-    const j = await res.json();
-    if (!res.ok || !Array.isArray(j.search_result) || !j.search_result.length) {
-      console.log('[web] 付费搜索无结果', res.status, j.error ? j.error.message : '');
-      if (res.status === 429 || (j.error && String(j.error.code) === '1113')) {
-        wsDeadUntil = Date.now() + 30 * 60 * 1000;
-        console.log('[web] 额度用完 → 30 分钟内不再敲付费接口');
-      }
-      return '';
-    }
-    const text = j.search_result.slice(0, ws.count || 5).map((r, i) =>
-      `【${i + 1}】${r.title || ''}\n${(r.content || '').trim()}\n来源：${r.link || r.url || ''}`
-    ).join('\n\n');
-    cache.set(q, { t: Date.now(), text });
-    console.log(`[web] 付费兜底搜到 ${j.search_result.length} 条「${q}」`);
-    return text;
-  } catch (e) {
-    console.log('[web] 付费搜索失败', e.name === 'AbortError' ? '超时' : e.message);
-    return '';
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 // 预热（2026-10-22 速度优化）：主人说话要等「说完才答」（≥6 秒），这段时间足够把搜索跑完。
@@ -493,6 +381,142 @@ async function moegirlLookup(q) {
   return '';
 }
 
+
+// ===== 垂直免费源（2026-11-23 加，全部零 Key、零费用）=====
+// 只在问题明显属于该领域时才跑（命中词表才调用），避免把技术/论文答案塞进闲聊。
+// 额度：StackExchange 300 次/日、arXiv/OpenLibrary 无限但请轻用、HN 无限制但只能搜已提交的条目。
+// net.getJson 在 crates.io / registry.npmjs.org 上会把进程直接打崩（exit 139），
+// 这两个站用全局 fetch 取（fetch 自己处理 gzip/分块），失败也不影响别的源。
+async function fetchJson(url, ms) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(ms || 8000), headers: { 'Accept': 'application/json', 'User-Agent': 'xuhbot-search' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+function plain(s) {
+  return String(s || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ').trim();
+}
+
+const VERTICAL = [
+  {
+    id: 'StackExchange',
+    hit: q => /(报错|错误|异常|失败|不生效|未定义|undefined is not|error|exception|traceback|stackoverflow)/i.test(q),
+    async run(q, net) {
+      const u = 'https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&pagesize=3'
+        + '&site=stackoverflow&filter=withbody&q=' + encodeURIComponent(q);
+      const j = await net.getJson(u, { timeout: 8000 });
+      return (j.items || []).map(it => ({ title: plain(it.title), content: plain(it.body).slice(0, 320), link: it.link }));
+    },
+  },
+  {
+    id: 'arXiv',
+    hit: q => /(论文|预印本|文献|arxiv|paper|preprint)/i.test(q),
+    async run(q, net) {
+      const u = 'https://export.arxiv.org/api/query?search_query=all:' + encodeURIComponent(q) + '&max_results=3';
+      // arXiv 只给 Atom XML，没有 JSON 接口 → 用 getText 抓回来粗抽（只取标题/摘要/链接，不解析完整 XML）
+      const xml = await net.getText(u, { timeout: 9000 });
+      const out = [];
+      const re = /<entry>([\s\S]*?)<\/entry>/g;
+      let m;
+      while ((m = re.exec(xml)) && out.length < 3) {
+        const e = m[1];
+        const title = plain((e.match(/<title>([\s\S]*?)<\/title>/) || [])[1]);
+        const sum = plain((e.match(/<summary>([\s\S]*?)<\/summary>/) || [])[1]);
+        const link = plain((e.match(/<id>([\s\S]*?)<\/id>/) || [])[1]);
+        if (title && link) out.push({ title, content: sum.slice(0, 320), link });
+      }
+      return out;
+    },
+  },
+  {
+    id: 'OpenLibrary',
+    hit: q => /(书|图书|作者|isbn|book|novel|小说)/i.test(q),
+    async run(q, net) {
+      const j = await net.getJson('https://openlibrary.org/search.json?limit=3&q=' + encodeURIComponent(q), { timeout: 8000 });
+      return (j.docs || []).map(d => ({
+        title: d.title + (d.author_name && d.author_name.length ? '（' + d.author_name[0] + '）' : ''),
+        content: ['初版 ' + (d.first_publish_year || '不详'), (d.subject || []).slice(0, 4).join('、')].filter(Boolean).join('；'),
+        link: 'https://openlibrary.org' + (d.key || ''),
+      }));
+    },
+  },
+  {
+    id: 'HackerNews',
+    hit: q => /(hacker ?news|黑客新闻|hn\b|创业|融资|startup)/i.test(q),
+    async run(q, net) {
+      const j = await net.getJson('https://hn.algolia.com/api/v1/search?hitsPerPage=3&query=' + encodeURIComponent(q), { timeout: 8000 });
+      return (j.hits || []).map(h => ({
+        title: plain(h.title || h.story_title || ''),
+        content: plain(h.comment_text || h.story_text || '').slice(0, 300) || ('热度 ' + (h.points || 0) + '、评论 ' + (h.num_comments || 0)),
+        link: h.url || ('https://news.ycombinator.com/item?id=' + h.objectID),
+      })).filter(h => h.title);
+    },
+  },
+  {
+    id: 'GitHub',
+    hit: q => /(github|仓库|开源项目|repo|star数)/i.test(q),
+    async run(q, net) {
+      const j = await fetchJson('https://api.github.com/search/repositories?per_page=3&q=' + encodeURIComponent(q));
+      return (j.items || []).map(r => ({
+        title: r.full_name + '  ★' + r.stargazers_count,
+        content: [r.description, r.language, r.updated_at && ('更新 ' + String(r.updated_at).slice(0, 10))].filter(Boolean).join(' · '),
+        link: r.html_url,
+      }));
+    },
+  },
+  {
+    id: 'npm',
+    hit: q => /(npm|package\.json|node 包|nodejs 库|前端依赖)/i.test(q),
+    async run(q, net) {
+      const j = await fetchJson('https://registry.npmjs.org/-/v1/search?size=3&text=' + encodeURIComponent(q));
+      return (j.objects || []).map(o => ({
+        title: o.package.name + ' ' + (o.package.version || ''),
+        content: [o.package.description, o.package.date && ('发布 ' + String(o.package.date).slice(0, 10))].filter(Boolean).join(' · '),
+        link: (o.package.links && o.package.links.npm) || ('https://www.npmjs.com/package/' + o.package.name),
+      }));
+    },
+  },
+  {
+    id: 'crates.io',
+    hit: q => /(cargo|crates?\.io|rust 库|rust crate)/i.test(q),
+    async run(q, net) {
+      const j = await fetchJson('https://crates.io/api/v1/crates?per_page=3&q=' + encodeURIComponent(q));
+      return (j.crates || []).map(c => ({
+        title: c.name + ' ' + (c.max_version || ''),
+        content: [c.description, c.downloads && ('下载 ' + c.downloads)].filter(Boolean).join(' · '),
+        link: 'https://crates.io/crates/' + c.name,
+      }));
+    },
+  },
+  {
+    id: 'HuggingFace',
+    hit: q => /(hugging ?face|大模型|微调|模型权重|checkpoint|safetensors)/i.test(q),
+    async run(q, net) {
+      const j = await fetchJson('https://huggingface.co/api/models?limit=3&search=' + encodeURIComponent(q));
+      return (j || []).map(m => ({
+        title: m.id,
+        content: ['likes ' + (m.likes || 0), m.pipeline_tag, m.lastModified && ('更新 ' + String(m.lastModified).slice(0, 10))].filter(Boolean).join(' · '),
+        link: 'https://huggingface.co/' + m.id,
+      }));
+    },
+  },
+];
+
+// 垂直源按词表触发；命中才跑，跑不到就安静地交给后面的通用链
+async function verticalLookup(q, ws) {
+  const net = require('./net');
+  for (const v of VERTICAL) {
+    if (!v.hit(q)) continue;
+    try {
+      const hits = await v.run(q, net);
+      if (hits.length) { console.log('[web] ' + v.id + ' 搜到 ' + hits.length + ' 条「' + q + '」'); return fmtHits(hits, 5); }
+    } catch (e) { console.log('[web] ' + v.id + ' 失败：' + String(e.message).slice(0, 40)); }
+  }
+  return '';
+}
+
 // 免费主路径（2026-11-07 主人定）：先看是不是「有确定数据可查」的题（宝可梦），
 // 再看是不是动漫/角色类（萌娘），最后退回免费抓页。三段都 0 元、免 Key、国内实测可连。
 // 为什么宝可梦排前面：抓 Bing 得到的是一堆二手网页，模型还得从里面挑；PokeAPI 给的是官方数字，
@@ -508,30 +532,36 @@ async function freeFallback(q, ws) {
       return pk;
     }
   }
-  if (ws.moegirl !== false) {
-    const moe = await moegirlLookup(q).catch(() => '');
-    if (moe) {
-      rememberOfficial(q, moe, '萌娘百科官方 API');
-      cache.set(q, { t: Date.now(), text: moe });
-      return moe;
-    }
+  // 三路并发开跑，谁的活干完都不耽搁：垂直源（词表触发）、百科（权威）、通用网页（覆盖广）。
+  // 排序按「通用 > 快速 > 兼容」决定「先取谁的结果」，并发只影响等待时间，不影响优先级。
+  const vp = verticalLookup(q, ws).catch(() => '');   // 命中词表才真发请求，没命中立刻返回空
+  const gp = generalWeb(q, ws).catch(() => '');
+  // 萌娘与维基都是「按标题直取」，互不依赖 → 并发跑，萌娘的结果仍优先。
+  // 3.5 秒封顶：实测命中多在 1 秒内，超过这个点基本就是查不到，别让它把整条搜索拖到 8 秒。
+  const [moe, kb] = await withCap(Promise.all([
+    ws.moegirl !== false ? moegirlLookup(q).catch(() => '') : '',
+    // 维基百科 / Wikidata：官方 JSON API，0 元 0 Key，走代理（主人 2026-11-07 要求加代理）。
+    // 结果优先级放在萌娘之后：二次元问题萌娘更准，通用知识维基覆盖更广。
+    ws.wikipedia !== false ? knowledge.lookup(q, { proxyCfg: ws.proxy }).catch(() => '') : '',
+  ]), 3500, ['', '']);
+  if (moe) {
+    rememberOfficial(q, moe, '萌娘百科官方 API');
+    cache.set(q, { t: Date.now(), text: moe });
+    return moe;
   }
-  // 维基百科 / Wikidata：官方 JSON API，0 元 0 Key，走代理（主人 2026-11-07 要求加代理）。
-  // 放在萌娘之后：二次元问题萌娘更准，通用知识维基覆盖更广。
-  if (ws.wikipedia !== false) {
-    const kb = await knowledge.lookup(q, { proxyCfg: ws.proxy }).catch(() => '');
-    if (kb) {
-      rememberOfficial(q, kb, kb.includes('Wikidata') ? 'Wikidata 官方 API' : '维基百科官方 API');
-      cache.set(q, { t: Date.now(), text: kb });
-      return kb;
-    }
+  const v = await vp;                                 // 垂直源：报错/论文/书/HN，精确度高于通用网页
+  if (v) { cache.set(q, { t: Date.now(), text: v }); return v; }
+  if (kb) {
+    rememberOfficial(q, kb, kb.includes('Wikidata') ? 'Wikidata 官方 API' : '维基百科官方 API');
+    cache.set(q, { t: Date.now(), text: kb });
+    return kb;
   }
   // 通用网页搜索（0 元官方 API，2026-11-22 加）：官方三源没命中时兜底；面板开关 webSources 关掉就不跑
   {
     let _mode = {};
     try { _mode = (configStore.cfgLive().intent || {}).mode || {}; } catch (e) { _mode = {}; }
     if (_mode.webSources !== false) {
-      const g = await generalWeb(q, ws).catch(() => '');
+      const g = await gp;
       if (g) { cache.set(q, { t: Date.now(), text: g }); return g; }
     }
   }
@@ -561,6 +591,7 @@ function retryKey(q) {
 
 // 智谱用不了时的免费兜底：抓 Bing → 过滤无关结果 → 拼成给模型看的摘要
 // 同时搜「原句核心」和「只留名字」两条，谁的结果真的相关就用谁（Bing 只认短词，长句一定废）
+const BING_NOTE = '（联网兜底搜到的，来源杂、可能不准，判断不了就讲已知、给方向）\n\n';   // 两处兜底结果共用同一段说明，别各写一遍
 async function bingFallback(q, ws) {
   const coreQ = bingQuery(q);
   const loose = looseQuery(coreQ);
@@ -599,8 +630,7 @@ async function bingFallback(q, ws) {
       clearTimeout(tm);
       console.log(`[web] 原句查不中，换词「${rk}」再查一轮：${retry.length ? '搜到 ' + retry.length + ' 条' : '仍无相关内容'}`);
       if (retry.length) {
-        const text = '（联网兜底搜到的，来源杂、可能不准，判断不了就讲已知、给方向）\n\n'
-          + retry.slice(0, ws.count || 5).map((r, i) => `【${i + 1}】${r.title}\n${r.content}\n来源：${r.link}`).join('\n\n');
+        const text = BING_NOTE + fmtHits(retry, ws.count || 5);
         cache.set(q, { t: Date.now(), text });
         return text;                    // 查到了 → core 走「非 miss」分支，把结果正常讲出来
       }
@@ -611,8 +641,7 @@ async function bingFallback(q, ws) {
     cache.set(q, { t: Date.now(), text: miss, ttl: 2 * 60 * 1000 });
     return miss;
   }
-  const text = '（联网兜底搜到的，来源杂、可能不准，判断不了就讲已知、给方向）\n\n'
-    + alt.slice(0, ws.count || 5).map((r, i) => `【${i + 1}】${r.title}\n${r.content}\n来源：${r.link}`).join('\n\n');
+  const text = BING_NOTE + fmtHits(alt, ws.count || 5);
   cache.set(q, { t: Date.now(), text });
   console.log(`[web] Bing 兜底搜到 ${alt.length} 条「${best.q}」${best.q !== coreQ ? '（原句搜不到，换成短词）' : ''}`);
   return text;
@@ -703,12 +732,6 @@ async function linkBlock(text) {
   return '（对方发来了链接，我替你打开看了：\n' + lines.join('\n') + '\n'
     + '标题就是网页的名字，可以直接说出来；简介写的它是干什么的。正文我没读，'
     + '所以只许围绕标题/简介说，说不清就讲标题简介、给方向——绝不许拿记忆里的游戏、动漫、作品硬套上去当解释。）';
-}
-
-// 注册表只读：给探针脚本 / 面板显示用；额度与核实结论见 docs/搜索源核实表.md
-function listProviders() {
-  return PROVIDERS.map(p => ({ id: p.id, name: p.name, cat: p.cat, needKey: p.needKey,
-    quota: p.quota, usable: p.usable, verified: p.verified, source: p.source, note: p.note }));
 }
 
 module.exports = { search, prewarm, sniffLink, linkBlock, listProviders, _providers: PROVIDERS, _anysearch: anysearchSearch,

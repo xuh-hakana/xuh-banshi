@@ -244,7 +244,7 @@ function groupsFor(atUids) {
   return Array.from(map.values());
 }
 /* atKeys 里两项都能写：connect.json 的键名（masterQQ / oniiQQ），或直接写 QQ 号。
- * 她 2026-11-23 要把群友直接加进来（「加入 100000000、和另一个 o 开头的群友」），
+ * 她 2026-11-23 要把群友直接加进来（「加入 1000000002、和另一个 o 开头的群友」），
  * 写号不用先去 connect.json 造一个键名。 */
 function atUidsOf(h, fullCfg) {
   const keys = Array.isArray(h.atKeys) ? h.atKeys : ['masterQQ', 'oniiQQ'];
@@ -312,7 +312,7 @@ function noteSpeak(gid, uid, atMs) {
 /* ---------- 主动消息发哪个群 ----------
  * 她 2026-11-23：「把每日上线提醒也改到这个群」。上线日报（src/daily-stats.js）/ 开发汇报 / 保健提醒
  * 三条主动消息共用这一个群号：改 features.json 的 healthRemind.groupId 一处，三条一起变，
- * 不再各写一个群号（以前都写死 cfg.testGroup 100000000）。
+ * 不再各写一个群号（以前都写死 cfg.testGroup 1000000004）。
  */
 function targetGroup() {
   try {

@@ -330,7 +330,8 @@ function enqueueItem(st, src, screened, opts) {
   try {
     const pureLines = Array.isArray(item.lines) ? item.lines.map(l => String((l && l.text) || '')) : [];
     const pureText = pureLines.length ? pureLines.join('\n') : String(screened.text || '');
-    premium = poopQuality.isPremium(pureText, poopQuality.imageKeysOfItem(screened));
+    // 图描述一起进去重口径（2026-11-22 主人定）：字一样、图不同的两条才算不同的屎
+    premium = poopQuality.isPremium(pureText, poopQuality.imageKeysOfItem(screened), poopQuality.descsOfItem(screened));
   } catch (e) {}
   let n = 0;
   for (let i = 0; i < parts.length; i++) {

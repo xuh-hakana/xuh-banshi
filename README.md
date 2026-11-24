@@ -1,75 +1,199 @@
-# xuhbot
+# 虚幻 · xuhbot
 
-> 版本：v0.0.1（公开版 · 未检查（不稳定））
+三个能单独用的 QQ 群工具：**自动搬屎不重复**、**表情包自动分池**、**色图隔离收集**。
 
+再自带一个可选的陪伴机器人面板。不装面板，三个工具照样跑。
 
-QQ 陪伴机器人。单进程 Node 程序，接 NapCat（OneBot 11 反向/正向 WS），带本地管理面板与 Electron 桌面客户端。
+> 需要 NapCat（QQ 协议端）和 Node.js ≥ 22，和本程序跑在同一台机器上。
 
-## 运行前提
+---
 
-| 依赖 | 版本 | 说明 |
+## 它解决什么问题
+
+群里天天有人发同一张屎，搬来搬去全是重复；表情包攒了几千张却找不到想发的；
+一不留神有张色图直接进群，群被封了才看见。
+
+这三个工具分别管这三件事：把屎搬走且只搬一次、把图收进能找得到的池子、把不该进群的图拦在外面。
+
+---
+
+## 一、自动搬屎（去重）
+
+**做什么**：把 A 群的新消息转到 B 群，同一条永远不会搬第二遍。
+
+**什么时候动**：后台按间隔轮询源群（`movePoop.pollSeconds`，默认 2 秒一次），发现新消息就按冷却规则转到目标群。
+你不发消息它也在看，但不会给任何人发提示。
+
+**你会看到**：
+
+- 源群出现一条新屎，几秒后出现在目标群，是合并转发的形式
+- 同一条再发一次、或者重启程序，都不会重复出现
+- 被点赞、被回复、之后 5 分钟里还在聊这件事的屎，会比其他屎更早搬到目标群
+- 目标群太安静时可以开冷却（`movePoop.cooldownDaySeconds`），避免一次性刷屏
+
+**两种模式**：
+
+| 模式 | 行为 | 适合 |
 |---|---|---|
-| Node.js | 22.x | 需要 `require(ESM)` 支持；`src/dice.js` 依赖此特性加载 dicescript |
-| NapCat | 任意近期版本 | 提供 OneBot 11 接口；QQ 连接由它维护，本项目只连它的 WS 端口 |
-| Python 3 | 3.x | 仅 `src/scripts/sticker_hash.py`（表情包指纹）与 `src/scripts/qzone_stroll.py` 使用 |
+| `plain`（默认） | 收到就搬，不等反应 | 源群基本没人贴表情 |
+| `emoji` | 等 10 分钟让群友贴表情，好评多于差评才搬 | 源群会主动用表情投票 |
 
-## 目录结构
+**默认是关的**。`movePoop.enabled` 为 `false`、源群和目标群都是空的时候，它一条都不会转发。
+填好 `sourceGroups` / `targetGroups` 才会动，不会误搬。
 
+---
+
+## 二、表情包自动分池
+
+**做什么**：群里发出来的图自动收进表情包库，按「常用」「可用」分开存，用的时候能按意思找到。
+
+**什么时候动**：群友在群里发图的那一刻就入库，不需要你操作；
+聊天时你说到某个词、或者语气到了，机器人会从池子里挑一张发出来。
+
+**你会看到**：
+
+- 新图自动进库，不用手动保存；同一张图重复发不会存两份
+- 想固定触发词，就在库里那张关键词表写死，说到就发
+- 截图、插画、漫画页这些不像表情包的图不进池子，单独隔离
+- 池子里的表情包**永远不会被自动删除**，放多久都还在
+
+---
+
+## 三、色图隔离收集
+
+**做什么**：图先判级再进群。判定是色图的不进群，单独收进隔离目录；正常图照常处理。
+
+**什么时候动**：每张新图入库时判一次；B 站动态、评论里抓到的图也判。
+
+**你会看到**：
+
+- 色图不会出现在群里，也不会混进表情包池
+- 隔离区按天保留（`blockedKeepDays`，默认 30 天），到期自动清掉，不占地方
+- 判错了也能改：判成色图的可以放回池子，正常图也能手动隔离
+
+---
+
+## 资源占用
+
+| 项目 | 实测 / 说明 |
+|---|---|
+| 程序体积 | 打包后 320 个文件、11 MB（含 4 张界面截图）；依赖 `node_modules` 约 4 MB |
+| 表情包磁盘 | 按张累积，实测 1670 张约 812 MB（平均每张约 0.5 MB） |
+| 隔离图磁盘 | 30 天自清，不会无限涨 |
+| 内存 / CPU | 未实测（沙箱读不到进程指标）。单 Node 进程，没轮询到新消息时基本不干活 |
+| 网络 | 只在收到新图、搬屎时出网；同一张图重发不会重新下载 |
+| 费用 | 用你自己的模型 Key，按调用次数计费。不需要图片自动描述时关掉，明显省钱 |
+
+## 客户端
+
+自带一个 Electron 桌面客户端，不是把网页套壳——外壳、左栏、动效、皮肤、雨夜玻璃都是原版那一套，只留三个工具的入口：
+
+| 入口 | 干什么 |
+|---|---|
+| 表情包 | 看池子、指纹表维护（去重）、情绪书 / 情绪触发词 |
+| 搬屎 | 现在的状态、冷却、最近搬过的、按群统计（只读，不在这里改配置） |
+| ⚙ 参数 | 右下角浮层：三个工具的开关、数值、触发词 |
+
+![客户端 · 表情包（白天）](docs/截图/客户端-表情包白天.png)
+
+![客户端 · 表情包（夜雨玻璃）](docs/截图/客户端-表情包夜晚.png)
+
+![客户端 · 搬屎](docs/截图/客户端-搬屎.png)
+
+![客户端 · 参数开关（右下角 ⚙）](docs/截图/客户端-参数.png)
+
+*以上是本机真实界面截图，数据来自本机的库。*
+
+---
+
+## 安装
+
+```bash
+git clone https://github.com/xuh-hakana/xuhbot.git
+cd xuhbot
+npm install
+npm run init
 ```
-xuhbot/
-├── src/                    主程序（代码与运行时数据同级）
-│   ├── bot.js              进程入口
-│   ├── core.js             调度核心：判定接话、生成回复、记忆读写
-│   ├── connectors/         qq.js（OneBot）、bili.js（B站直播）、bili-comment.js（评论区收图）
-│   ├── server/panel.js     本地面板服务端（127.0.0.1:8899）
-│   ├── config/             配置读写入口
-│   ├── persona/            人设与记忆（1-6 分层）
-│   ├── soul/               基础人格文件
-│   ├── data/               运行时数据（表情包、攻略、好感度、日志、花费账）
-│   │   └── usage/          token-usage.jsonl 花费账本
-│   ├── scripts/            Python 辅助脚本
-│   └── dice.js             骰子（SealDice 引擎封装）
-├── public/                 面板前端（panel.html / panel-client.js）
-├── app/                    Electron 桌面客户端（虚幻.app + main.js）
-├── tools/                  维护脚本（检查不记录群 / 重启AstrBot后端 / 同步梗站清单；.command / .sh / .py）
-├── tests/                  test-all.js、regress-panel.js
-├── docs/                   项目文档
-└── integrations/           AstrBot 桥接插件源码
+
+然后填两处必填：
+
+1. `.env` 里的 QQ 号和模型 Key
+2. `config/features.json` 里 `movePoop.sourceGroups` / `targetGroups`（想用搬屎的话）
+
+```bash
+npm start
 ```
 
-## 启动方式
+启动后 NapCat 扫码登录，群里就生效了。
 
-| 用途 | 命令 | 入口 |
+---
+
+## 配置
+
+所有开关都在 `config/features.json`，改完重启生效。常用的几个：
+
+| 字段 | 作用 | 默认 |
 |---|---|---|
-| 机器人本体 | 客户端「机器人」页启动，或 `NapCatInstaller.app` | `app/启动客户端.command`（虚幻.app） |
-| 桌面客户端 | `npm run client` | `app/启动客户端.command` |
-| 全部测试 | `npm test` | — |
+| `movePoop.enabled` | 搬屎总开关 | `false` |
+| `movePoop.mode` | `plain` 直接搬 / `emoji` 等表情投票 | `plain` |
+| `movePoop.sourceGroups` / `targetGroups` | 从哪些群搬、搬到哪些群 | 空 |
+| `stickerDir` | 表情包库位置 | `src/data/stickers` |
+| `blockedDir` / `blockedKeepDays` | 隔离图目录和保留天数 | `src/data/blocked` / 30 |
+| `biliDynamic.enabled` | B 站动态收集开关 | `false` |
 
-机器人本体由客户端（虚幻.app）经 `app/bot-runner.js` 拉起，不再有独立的 `tools/启动机器人.command`。
-网页面板（:8899）已弃用，管理功能全部在客户端里。
+完整字段和含义见 `config/features.json` 里的注释，逐条写清了。
 
-## 路径约定（改动前必读）
+---
 
-`src/` 下所有模块用 `const ROOT = __dirname;` 定位数据文件，不依赖进程工作目录。
-因此 `data/`、`persona/`、`soul/`、`config/` 必须与 `src/` 下的 `.js` 保持同级。
-把 `src/` 整体平移不破坏任何路径；把 `data/` 单独挪走需要同步修改每个模块的 `ROOT` 定义。
+## 它不做什么
 
-`src/connectors/` 下的模块多一层目录，其路径写作 `path.join(__dirname, '..', 'data', ...)`。
+- 不做云同步，所有图和数据都在你自己机器上，删了就没了
+- 不保证每张图都判对——表情包和色图边界模糊，判错是正常的，可以手动纠正
+- 不托管群权限，不管踢人、禁言、改群公告
+- 不能远程用，必须和 NapCat 在同一台机器上跑
+- 不替代你思考，只做收发和归类，发什么还是你说了算
 
-面板服务端 (`src/server/panel.js`) 的 `ROOT` 是 `path.join(__dirname, '..')`，前端静态文件从 `public/` 读取。
+---
 
-## 数据说明
+## 常见问题
 
-| 目录 | 内容 | 是否入库 |
-|---|---|---|
-| `src/data/stickers/` | 表情包，按池分目录（常用/可用/虚幻/关键词触发/少用） | 是，约 93 MB |
-| `src/data/guides/` | 攻略库 | 是 |
-| `src/persona/` | 人设正文、规则层、记忆数据 | 是 |
-| `src/data/usage/` | token 花费账本，按天保留 | 是 |
-| `src/data/*.log` | 运行日志 | 否（.gitignore） |
+**没有模型 Key 能跑吗？** 能。三个工具本身不依赖模型：搬屎、图入库、判级都是本地逻辑。
+Key 影响的是机器人聊天和描述生成，关了不影响这三个功能。
 
-## 与 AstrBot 的关系
+**表情包会被自动删吗？** 不会。只有隔离目录里的色图按天清理，表情包永久保留。
 
-两者可独立运行，也可让 AstrBot 作为 QQ 接入层、本项目作为判定层。
-约束：**同一条 QQ 连接只能由一方持有**，否则一条消息会被回复两次。
-接入方式见 `integrations/`。
+**判错了怎么办？** 在面板里改一次就行，改完不会因为同一张图再判错。
+
+**能开多个吗？** 一个 QQ 号一个实例，多号就多开几份目录。
+
+---
+
+## 依赖
+
+- 必需：Node.js ≥ 22、NapCat（QQ 协议端）
+- 可选：Python 3 + Pillow（更准的图判级）、ffmpeg（视频抽帧）
+- 可选：whisper 模型（语音转文字，约 1.5 GB，不用就别下）
+- 客户端：双击 `client/启动.command`（macOS/Linux）或 `client/启动客户端.bat`（Windows），第一次会自动装 Electron
+- Windows 打包版：`npm run pack:win` 出 `dist/xuhbot-win-0.3.0.zip`，解压后双击 `xuhbot.exe`
+
+每一样怎么装、装完填在哪、怎么确认接好了、报错怎么查，都在 **[接入依赖.md](docs/接入依赖.md)** 里。
+
+---
+
+## 文档与自检
+
+- 手动配置说明：[安装.md](安装.md)
+- 环境变量模板：`.env.example`
+- 公开版打包：`npm run pack:public`
+- 密钥自查：`npm run scan:secrets`
+- 测试：`npm test`（部分用例依赖真实数据，失败不一定是坏）
+
+---
+
+## 作者
+
+虚幻（[xuh-hakana](https://github.com/xuh-hakana)）· MIT License © 2026
+
+客户端外观里的雨滴效果来自 [SardineFish](https://github.com/SardineFish) 的 raindrop-fx，许可原文随文件一起放在 `client/renderer/raindrop-fx.LICENSE.txt`，署名见 [client/NOTICE.md](client/NOTICE.md)。
+
+搬屎算法原版是 [anka-afk/astrbot_sowing_discord](https://github.com/anka-afk/astrbot_sowing_discord)，本项目的 Node 版在它基础上加了去重、无脑模式和并发查询。

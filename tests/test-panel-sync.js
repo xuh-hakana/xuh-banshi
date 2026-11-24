@@ -74,13 +74,13 @@ console.log('③ 认人：面板按人物表认主人，不按名字串');
   const card = mrow && (mrow.accounts || []).map(a => (a.cards || {})).map(c => Object.values(c)).flat().filter(Boolean)[0];
   const idx = panel.chatNameIndex();
   if (card) {
-    const line = '2026-11-21T15:16:08.072Z [qq][群100000000][' + card + '] 测试一句';
+    const line = '2026-11-21T15:16:08.072Z [qq][群1000001000][' + card + '] 测试一句';
     const r = panel.parseChatLine(line, idx, '虚幻', '主人', null);
     ok('「' + card + '」被认成主人（mine）', () => assert.strictEqual(r.e.mine, true));
   } else {
     console.log('  (主人还没有群名片，跳过)');
   }
-  const line2 = '2026-11-21T15:16:08.072Z [qq][群100000000][那就是死了已被移出群聊] 测试一句';
+  const line2 = '2026-11-21T15:16:08.072Z [qq][群1000001001][那就是死了已被移出群聊] 测试一句';
   const r2 = panel.parseChatLine(line2, idx, '虚幻', '主人', null);
   ok('脏昵称「那就是死了已被移出群聊」也归主人（按 pid，不按名字）', () => assert.strictEqual(r2.e.mine, true));
 }

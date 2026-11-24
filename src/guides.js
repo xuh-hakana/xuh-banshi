@@ -27,7 +27,7 @@ const guideFiles = () => {
 const markOf = slug => '<!-- guide:' + slug + ' -->';
 const hasMark = raw => /^<!--\s*guide:[^>]*-->/i.test(String(raw || '').trimStart());
 /* 署名（2026-11-13 主人定）：攻略也按「人」署名，跟教学一条规矩——存 platform:id。
- * 位置在 guide 标记下面那一行 `<!-- by:qq:100000000 -->`；stripCmt 会把它一起剥掉，
+ * 位置在 guide 标记下面那一行 `<!-- by:qq:1000000002 -->`；stripCmt 会把它一起剥掉，
  * 所以既不进搜索结果、也不进提示词，纯粹是归属记录。 */
 const BY_RE = /<!--\s*by:([^>]*?)\s*-->/i;
 const byOf = raw => { const m = String(raw || '').match(BY_RE); return m ? String(m[1]).trim() : ''; };
@@ -730,7 +730,7 @@ function api(action, payload) {
  * 和 teach/梗词句.jsonl 的分工：那份是带署名的条目（可复核/可删/按在场判定），
  * 这份是词义正本（谁都能读）。去重按节标题：同一句再教一次不会堆两节。 */
 const MEME_NOTE_FILE = '梗词句.md';
-const MEME_NOTE_HEAD = '<!-- guide:梗词句 -->\n<!-- by:qq:100000000 -->\n# 梗词句\n\n'
+const MEME_NOTE_HEAD = '<!-- guide:梗词句 -->\n<!-- by:qq:1000000002 -->\n# 梗词句\n\n'
   + '> 这是干什么的：「记录的 · 学到的 · 梗词句」正本。每条 = 词义解析 + 固定梗句用法及示例 + 网络梗含义。\n'
   + '> 只在有人说到这个词时才读命中那一条，不整份塞提示词。\n';
 function memeNote(o) {

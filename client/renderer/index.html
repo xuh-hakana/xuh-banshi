@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!-- boot-hold：让第一帧就停在入场起始态（26px 下移 + 35% 透明），避免「先显示完整界面
+     再跳回起始态」的那一帧闪烁。窗口可见后由 app.js 换成 game-boot-anim 播完即摘。 -->
+<html lang="zh-CN" class="boot-hold">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' xuh: data: blob:; media-src xuh: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>虚幻</title>
+<!-- 基础样式：表情包页共用的一份 + 客户端本体的一份 -->
+<link rel="stylesheet" href="../../public/sticker-page.css">
+<link rel="stylesheet" href="../../public/emobook-page.css">
+<link rel="stylesheet" href="app.css">
+<!-- 夜晚模式（墨黑夜图纸 + 粉，和头图同色）+ 雨夜玻璃。删掉这一行 = 卸掉整套夜景与雨。 -->
+<link rel="stylesheet" href="night.css">
+<!-- 皮肤插件：聊天记录页的 QQ 气泡皮肤（独立目录；删掉这一行就卸掉，回到原列表样式） -->
+<link rel="stylesheet" href="skins/qq/skin.css">
+<!-- 2026-11-14：原 game.css「角色终端 HUD」那套夜晚切角皮肤已删除（并入 night.css 的换色方案），
+     里面唯一还有用的「开场入场动画」搬进了 app.css 末尾。 -->
+</head>
+<body>
+<div class="app">
+
+  <aside class="rail" id="rail">
+    <!-- 左上角那张图：贴在窗口最左上，绝对定位、不占布局高度，所以下面的按钮位置不受影响 -->
+    <div class="brand-art" id="brand-art" aria-hidden="true"></div>
+    <!-- 左栏默认整块藏起来，只在左边缘留一条 12px 的感应区。碰一下才弹出来（弹性动画），
+         移开就收回去。选中项的「小标」是 #railTick，贴在窗口左边缘、不占布局。 -->
+    <div class="brand" id="brand">
+      <span class="brand-name">虚幻</span>
+      <span class="brand-sub">客户端</span>
+    </div>
+
+    <!-- 左栏条目不再硬编码：一律由 app.js 的 RAIL_SPEC 按「四类」渲染（她 2026-11-16 定）。
+         1 类（汇总即无意义的）不进左栏，只留在悬浮窗；
+         2 类（同时有全记录 + 单人物记录）进左栏，进页后可再点人物下钻；
+         3 类（只有全记录、无人物分区）进左栏，但只有一级；
+         4 类（只读、不含改动操作）收进「其他」一个入口，点开显示被收走的全部。 -->
+    <nav class="nav" id="nav"></nav>
+
+    <div class="rail-foot">
+      <button class="rail-link" id="open-skin">换左上角图</button>
+      <button class="rail-link" id="open-artpos">调头图位置</button>
+      <button class="rail-link" id="open-data">数据目录</button>
+      <button class="rail-link" id="open-stickers">表情包目录</button>
+    </div>
+  </aside>
+
+  <!-- 左边缘感应区（2026-11-14 主人令）：默认整块左栏藏起来，只留这一条 12px 的透明热区。
+       碰一下 → 左栏弹出来（弹性）；移开 → 收回去。选中项的「小标」贴在窗口左边缘、不占布局。 -->
+  <div class="rail-hot" id="railHot" title="碰这里弹出菜单"></div>
+  <div class="rail-tick" id="railTick" aria-hidden="true"><i></i></div>
+  <!-- 二级菜单：碰某个入口后从它右边展开（单人 / 群 / 平台 / 全部） -->
+  <div class="rail-fly" id="railFly" hidden></div>
+
+  <main class="stage">
+    <header class="topbar">
+      <button class="btn btn-quiet home-back" id="homeBack" type="button" hidden data-act="home-back" title="回到聊天记录主页">← 主页</button>
+      <h1 class="view-title" id="view-title">聊天记录</h1>
+      <div class="topbar-right">
+        <span class="pill" id="pill-bot" title="QQ 连接状态">—</span>
+        <!-- 雨夜参数：只在夜晚出现（night.css 里白天不可见但保留占位）。特意放在「夜/昼」左侧：
+             它白天隐形、夜里显示，占位始终存在 —— 这样切换昼夜时「夜/昼」和「刷新」按钮一像素不动，
+             不会被突然冒出来的「雨」挤走。 -->
+        <button class="btn btn-quiet rain-tune-btn" id="rainTuneBtn" type="button" aria-expanded="false" aria-controls="rainTune" title="雨夜参数：晃动幅度、窗口模糊、窗口底色、窗外亮度、雨珠大小、雨量（只在夜晚出现）">雨</button>
+        <!-- 雨滴特效来源署名（第三方 raindrop-fx，点问号看作者/许可；不改库本体） -->
+        <button class="credit-q" type="button" data-act="credit" data-key="rain" title="这个雨滴特效是谁做的、用的什么许可" aria-label="雨滴特效署名">?</button>
+        <!-- 白天 / 夜晚切换：夜晚模式才挂雨夜玻璃。状态存本地，下次打开还是上次选的 -->
+        <button class="btn btn-quiet" id="btn-check" type="button" title="让虚幻自己体检一遍（语法/JSON/必备文件/单测/运行）">体检</button>
+        <button class="btn btn-quiet" id="btn-tidy" type="button" title="全局净化：清掉人设/说话风格/梗库/话题里的排版符号">净化</button>
+        <button class="btn btn-quiet" id="themeBtn" type="button" title="切换到夜晚模式（含雨夜玻璃）">夜</button>
+        <button class="btn btn-quiet" id="reload">刷新</button>
+      </div>
+    </header>
+
+    <!-- 页头：面包屑「主页 › 该项 › 某子类」+ 上一级。只在非主页时出现；
+         层级不封顶，多深都能回退（她 11-14 原话：一级、二级、三级、未来四级五级）。 -->
+    <div class="page-head" id="pageHead" hidden>
+      <div class="page-crumb" id="pageCrumb"></div>
+      <button class="btn btn-quiet page-up" id="pageUp" type="button" data-act="page-up" title="回到上一级">↑ 上一级</button>
+    </div>
+
+    <!-- 机器人这一组的切换标签（机器人本体/日记/写入日志/人设编辑/学习）。
+         放在 view 外面：切页重画 view 时标签栏不受影响，也不占滚动高度。由 bot-page.js 填充，非这组页自动隐藏。 -->
+    <div class="group-tabs meme-tabs" id="groupTabs" hidden></div>
+
+    <div class="view" id="view">
+      <div class="loading">读出数据中…</div>
+    </div>
+
+    <footer class="statusbar">
+      <span id="status-left">—</span>
+      <span id="status-mid"></span>
+      <span id="status-right"></span>
+    </footer>
+  </main>
+
+</div>
+
+<!-- ===========================================================================
+     悬浮工具坞（2026-11-14 主人令）
+     ---------------------------------------------------------------------------
+     她原话：「右下角入口全堆在一起」「以后如果要加这种悬浮窗口，必须全都改成可拖动的」。
+     原来这里是一个 ⇄ 圆钮（app.js 里画，bottom:18）+ 一个 ⚙ 圆钮（bottom:34），直接叠住。
+     现在合并成这一个坞：左边六点握把（按住整块能拖，位置记住）+ 两个图标按钮。
+     拖动逻辑在 app.js 的「浮窗系统」（floatWin），跟参数面板、聊天浮层、雨夜面板同一套。
+     加新入口的规矩：往这个坞里加一个 .fab，不许再新起 position:fixed 的圆钮。
+     =========================================================================== -->
+<div class="fab-dock" id="fabDock" role="toolbar" aria-label="悬浮工具">
+  <span class="fab-dock__grip" title="按住这里拖动 · 位置会记住"></span>
+  <!-- 参数：点开浮层抽屉（开关 / 数值 / 触发地图） -->
+  <button class="fab" id="fabParam" type="button" title="参数 · 点开调开关 / 数值 / 触发词">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h4M13 7h7M4 12h8M17 12h3M4 17h2.5M11.5 17h8.5"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="10.5" cy="7" r="2.1"/>
+        <circle cx="14.5" cy="12" r="2.1"/>
+        <circle cx="9" cy="17" r="2.1"/>
+      </g>
+    </svg>
+  </button>
+</div>
+<div class="param-panel" id="paramPanel" role="dialog" aria-label="参数" aria-modal="false" hidden>
+  <div class="param-panel__head">
+    <span class="param-panel__title">参数</span>
+    <span class="param-panel__hint">点开关即时生效 · 不刷新主页面</span>
+    <button class="param-panel__x" id="paramClose" type="button" data-act="param-close" title="收起" aria-label="收起">×</button>
+  </div>
+  <div class="param-panel__body" id="paramBody"></div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- 调头图位置：拖预览框里的图，松开就记住（位置存 src/data/ui.json 的 brandPos） -->
+<div class="modal" id="art-modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-label="调头图位置">
+    <div class="modal-head">
+      <h2>头图位置</h2>
+      <span class="modal-x" data-act="art-close" title="关掉">×</span>
+    </div>
+    <div class="art-stage" id="art-stage" title="按住拖动，把图挪到想要的位置"></div>
+    <div class="art-tools">
+      <button class="btn btn-quiet" data-art="up" title="往上">↑</button>
+      <button class="btn btn-quiet" data-art="down" title="往下">↓</button>
+      <button class="btn btn-quiet" data-art="left" title="往左">←</button>
+      <button class="btn btn-quiet" data-art="right" title="往右">→</button>
+      <button class="btn btn-quiet" data-act="art-reset" style="margin-left:auto">复位</button>
+    </div>
+    <div class="small dim" style="margin-top:10px">上面是缩小的预览，和你窗口里看到的一样。拖到顺手就行，松手就存。</div>
+  </div>
+</div>
+
+<!-- 雨夜调参面板：由 rain-night.js 接线。删掉本节点 + #rainTuneBtn + 两个 rain script = 回滚到没有雨。 -->
+<div class="rain-tune" id="rainTune" role="dialog" aria-label="雨夜参数">
+  <div class="rain-tune__head">
+    <span class="rain-tune__title">雨夜</span>
+    <span class="rain-tune__hint">拖动即时生效 · 仅夜晚可见</span>
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">晃动幅度</span><span class="rain-tune__val" id="rtShiftVal">80 px</span></div>
+    <input type="range" id="rtShift" min="0" max="120" step="1" value="80" aria-label="晃动幅度">
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">窗口模糊</span><span class="rain-tune__val" id="rtBlurVal">8 px</span></div>
+    <input type="range" id="rtBlur" min="0" max="20" step="1" value="8" aria-label="窗口模糊">
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">窗口底色</span><span class="rain-tune__val" id="rtAlphaVal">26 %</span></div>
+    <input type="range" id="rtAlpha" min="0" max="90" step="1" value="26" aria-label="窗口底色不透明度">
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">窗外亮度</span><span class="rain-tune__val" id="rtLumVal">50 %</span></div>
+    <input type="range" id="rtLum" min="10" max="100" step="1" value="50" aria-label="窗外亮度">
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">雨珠大小</span><span class="rain-tune__val" id="rtDropVal">45 px</span></div>
+    <input type="range" id="rtDrop" min="20" max="140" step="1" value="45" aria-label="雨珠大小">
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">雨量</span><span class="rain-tune__val" id="rtFlowVal">240</span></div>
+    <input type="range" id="rtFlow" min="40" max="600" step="10" value="240" aria-label="雨量">
+  </div>
+  <div class="rain-tune__row">
+    <div class="rain-tune__line"><span class="rain-tune__name">随机变化</span><span class="rain-tune__val" id="rtRandVal">开</span></div>
+    <button class="rain-tune__toggle" id="rtRand" type="button" aria-pressed="true">雨珠大小 / 雨量 / 模糊 / 高光 自动起伏</button>
+  </div>
+  <div class="rain-tune__foot">
+    <button class="rain-tune__btn" id="rtReset" type="button">恢复默认</button>
+    <button class="rain-tune__btn rain-tune__btn--close" id="rtClose" type="button">关掉</button>
+  </div>
+</div>
+
+<script src="../../public/sticker-page.js"></script>
+<script src="../../public/emobook-page.js"></script>
+<script src="poop-panel.js"></script>
+<script src="app.js"></script>
+<!-- 雨夜玻璃：第三方库本体 + 项目接线。删掉这两行即整体回滚，雨不再出现。 -->
+<script src="raindrop-fx.js"></script>
+<script src="rain-night.js"></script>
+<!-- 头图取色 → 主色：独立脚本，不改 app.js，监听 #brand-art 变化自动重取。
+     删掉这一行，主色回到 app.css 的 :root 兜底值。 -->
+<script src="theme-from-art.js"></script>
+</body>
+</html>

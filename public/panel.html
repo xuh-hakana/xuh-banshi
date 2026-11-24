@@ -561,5 +561,26 @@ window.onerror = function (m, u, l) {
 </script>
 <script src="/sticker-page.js"></script>
 <script src="/client.js"></script>
+<div id="boardBar" style="position:fixed;left:8px;bottom:8px;z-index:9999;font:12px/1.5 -apple-system,'PingFang SC',sans-serif;background:rgba(18,18,22,.88);color:#dcdcdc;padding:6px 10px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.35);cursor:pointer" title="点一下刷新" onclick="loadBoard()">面板数据加载中…</div>
+<script>
+async function loadBoard() {
+  const el = document.getElementById('boardBar');
+  try {
+    const r = await fetch('/api/board');
+    const j = await r.json();
+    const p = j.poop || {}, m = j.media || {}, e = j.errs || {}, b = j.blocked || {};
+    const q = p.queue || {}, fw = p.forwarded || {};
+    const gs = (q.byGroup || []).map(x => x.count + ' @' + x.groupId).join('  ');
+    el.textContent = '搬屎队列 ' + (q.total || 0) + (gs ? '（' + gs + '）' : '')
+      + '｜去重记忆 ' + (p.total || 0)
+      + '｜今日搬 ' + (fw.today || 0) + ' / 累计 ' + (fw.total || 0)
+      + '｜色图 ' + (m.nsfw || 0) + '｜图 已读 ' + (m.read || 0) + ' / 未读 ' + (m.unread || 0)
+      + '｜被拦图 ' + (b.files || 0) + '（' + (b.keepDays || 30) + ' 天清）'
+      + '｜24h 报错 ' + (e.count24h || 0);
+  } catch (err) { el.textContent = '面板数据取不到（' + err.message + '）'; }
+}
+loadBoard();
+setInterval(loadBoard, 60000);
+</script>
 </body>
 </html>

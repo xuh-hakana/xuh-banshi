@@ -89,7 +89,7 @@ function add(o) {
   const what = String(it.what || '').replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!date || !what) return null;
   let who = String(it.who == null ? 'self' : it.who).trim() || 'self';
-  // 键统一成 'platform:id'（2026-11-06）：QQ 也写成 qq:100000000。
+  // 键统一成 'platform:id'（2026-11-06）：QQ 也写成 qq:1033830163。
   // 档案查不到照样落盘（裸号按 QQ），读的时候 keysOfWho 两种写法都认，老条目不用迁。
   if (who !== 'self') {
     try { const k = require('./people').keyOf(who); if (k) who = k; } catch {}

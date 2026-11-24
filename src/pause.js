@@ -44,7 +44,7 @@ function listAll() { return cleanup(); }
 /* 消息要不要闭嘴：isPrivate + user_id + group_id。
  * 主人（masterQQ / masters）的**私聊**永远不拦——遥控权优先，不然停了就解不开；
  * 但主人在**被暂停的群里**说话，她也得闭嘴（主人 2026-10-23 真事：
- * 「暂停100000000」之后她在群里回「我去」「看来并非」，主人当场说「这个暂停没有用啊」——
+ * 「暂停894917172」之后她在群里回「我去」「看来并非」，主人当场说「这个暂停没有用啊」——
  * 因为以前主人一律豁免，群里也被豁免了）。
  * 群里解暂停靠命令：暂停/允许命令在暂停闸**之前**处理，所以照样能解开。 */
 function blocked(isPrivate, uid, gid) {
@@ -73,9 +73,9 @@ function humanDur(ms) {
 }
 
 /* 命令解析（只处理主人私聊）：
- *   暂停群100000000 / 暂停 100000000 / 暂停群100000000 30分钟
- *   暂停私聊100000000 / 暂停私聊 欧尼酱 / 暂停欧尼酱 2小时
- *   允许群100000000 / 允许欧尼酱
+ *   暂停群894917172 / 暂停 894917172 / 暂停群894917172 30分钟
+ *   暂停私聊1000000002 / 暂停私聊 欧尼酱 / 暂停欧尼酱 2小时
+ *   允许群894917172 / 允许欧尼酱
  *   暂停列表 / 查看暂停
  * 返回 null = 不是暂停命令，继续走聊天。 */
 function parseCommand(text, people, isKnownGroup) {
@@ -104,13 +104,13 @@ function parseCommand(text, people, isKnownGroup) {
   let durMs = 0;
   const dm = target.match(DUR_RE);
   if (dm) { durMs = parseDur(target); target = target.slice(0, dm.index).trim(); }
-  if (!target) return { msg: '要说清楚暂停哪个群/哪个人哦，比如「暂停群100000000 30分钟」。' };
+  if (!target) return { msg: '要说清楚暂停哪个群/哪个人哦，比如「暂停群894917172 30分钟」。' };
 
   // 名字 → QQ（称呼表），纯数字 → 群号或QQ号
   let kind = '', id = '', shown = '';
   const nameHit = Object.entries(ppl).find(([qq, name]) => name === target);
   if (kindWord === '群' || /^\d{5,12}$/.test(target) && !nameHit && knownGroup(target)) {
-    if (!/^\d{5,12}$/.test(target)) return { msg: '群要用群号暂停（我这里只认群号），比如「暂停群100000000」。' };
+    if (!/^\d{5,12}$/.test(target)) return { msg: '群要用群号暂停（我这里只认群号），比如「暂停群894917172」。' };
     kind = 'group'; id = target; shown = '群' + target;
   } else if (nameHit || /^\d{5,12}$/.test(target) || kindWord === '私聊') {
     if (nameHit) { kind = 'person'; id = nameHit[0]; shown = nameHit[1] + '（' + nameHit[0] + '）的私聊'; }

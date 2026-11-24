@@ -7,7 +7,7 @@
 import os, sys, json, shutil, time
 from multiprocessing import Pool
 
-ROOT = "/Volumes/980/xuhuan mac/xuhbot"
+ROOT = "."
 D = os.path.join(ROOT, "src", "data", "stickers")
 REC = os.path.join(D, "回收站")
 DIRS = ["常用", "可用", "关键词触发", "少用", "难用", "大图", "虚幻"]

@@ -86,7 +86,7 @@ function docFirstRules() {
   const master = String(cfg.masterQQ || (cfg.masters || [])[0] || '');
   async function turn(label, uid, nick) {
     const k = 'persona_selfcheck_' + label;   // 只是内存 Map 的键，不落盘
-    core.setTurn(k, { uid, nick, gid: '100000000', atMe: true, scope: '群100000000' });
+    core.setTurn(k, { uid, nick, gid: '1000001000', atMe: true, scope: '群1000001000' });
     const msgs = await core.buildMessages(k, '你好呀');
     // 第一条是 systemPrompt 本体，后面才是这一轮按人注入的；分开看才判得准
     return msgs.slice(1).map(m => String(m.content || '')).join('\n');
@@ -133,20 +133,20 @@ function docFirstRules() {
   t('主人这轮没拿到别人的 Ciallo 约定', !me.includes(PACT_HEAD));
   t('主人这轮有「不许套用」提醒', me.includes(NO_COPY));
 
-  const qh = await turn('qiehuo', '100000000', '企鹅火丁');
+  const qh = await turn('qiehuo', '1000001001', '企鹅火丁');
   t('企鹅火丁这轮注入的是「别人」块',
     qh.includes('这一轮跟你说话的不是主人') && !!rules.别人 && qh.includes(rules.别人.trim()));
   t('企鹅火丁拿到他自己的 Ciallo 约定', qh.includes(HIS_PACT), '按对应人物回没生效');
   t('企鹅火丁这轮不弹「不许套用」', !qh.includes(NO_COPY));
 
-  const cy = await turn('coufei', '100000000', '凑肥鱼');
+  const cy = await turn('coufei', '1000001002', '凑肥鱼');
   t('凑肥鱼这轮注入的是「别人」块', cy.includes('这一轮跟你说话的不是主人'));
   t('凑肥鱼没拿到企鹅火丁的 Ciallo 约定', !cy.includes(PACT_HEAD), '约定串人了');
   t('凑肥鱼这轮有「不许套用」提醒', cy.includes(NO_COPY));
 
   // ===== D. 数据层：按人取约定 =====
-  t('pactLines(企鹅火丁) 有 Ciallo', /Ciallo/i.test(String(core.pactLines('100000000') || '')));
-  t('pactLines(凑肥鱼) 为空', String(core.pactLines('100000000') || '').trim() === '');
+  t('pactLines(企鹅火丁) 有 Ciallo', /Ciallo/i.test(String(core.pactLines('1000001001') || '')));
+  t('pactLines(凑肥鱼) 为空', String(core.pactLines('1000001002') || '').trim() === '');
   t('otherPactHints 拿得到企鹅火丁的记号',
     (core.otherPactHints('0') || []).some(x => String(x.sig || '').includes('Ciallo')));
 
@@ -166,7 +166,7 @@ function docFirstRules() {
   t('她的道歉举例逐字搬到了我-被怪.md',
     fs.readFileSync(path.join(RESP_DIR, '我-被怪.md'), 'utf8').includes('对不起嘛…我刚刚嘴太快了'));
   const masterSay = async (key, text) => {
-    core.setTurn(key, { uid: master, nick: '主人', gid: '100000000', atMe: true });
+    core.setTurn(key, { uid: master, nick: '主人', gid: '1000001000', atMe: true });
     const msgs = await core.buildMessages(key, text);
     return msgs.slice(1).map(m => String(m.content || '')).join('\n');
   };
@@ -180,7 +180,7 @@ function docFirstRules() {
   t('普通闲聊 → 三份场合段都不灌',
     !calm.includes('才、才没有呢，真的吗？') && !calm.includes('对不起嘛…我刚刚嘴太快了')
     && !calm.includes('我是幽灵啦'));
-  core.setTurn('resp_watch', { uid: '100000000', nick: '凑肥鱼', gid: '100000000', atMe: true });
+  core.setTurn('resp_watch', { uid: '1000001002', nick: '凑肥鱼', gid: '1000001000', atMe: true });
   const watch = (await core.buildMessages('resp_watch', '这机器人是不是 AI 啊'))
     .slice(1).map(m => String(m.content || '')).join('\n');
   t('群友围观 → 注入别人-被围观', watch.includes('我是幽灵啦'));
@@ -190,14 +190,14 @@ function docFirstRules() {
   // 关键点：both=true，主人和陌生人一视同仁，不许对陌生人敷衍。
   const NEED = '有人问我事情，就是有人需要我';
   const TEACH = '有人教我，就是学到了新东西';
-  core.setTurn('resp_ask_stranger', { uid: '100000000', nick: '凑肥鱼', gid: '100000000', atMe: true });
+  core.setTurn('resp_ask_stranger', { uid: '1000001002', nick: '凑肥鱼', gid: '1000001000', atMe: true });
   const askStranger = (await core.buildMessages('resp_ask_stranger', '光合作用是什么呀'))
     .slice(1).map(m => String(m.content || '')).join('\n');
   t('陌生人提问 → 注入「被需要」', askStranger.includes(NEED),
     '陌生人问事不给她「被需要」，等于对陌生人和熟人两套脸');
   const askMaster = await masterSay('resp_ask_master', '这个是怎么回事');
   t('主人提问 → 同样注入「被需要」', askMaster.includes(NEED));
-  core.setTurn('resp_teach', { uid: '100000000', nick: '凑肥鱼', gid: '100000000', atMe: true });
+  core.setTurn('resp_teach', { uid: '1000001002', nick: '凑肥鱼', gid: '1000001000', atMe: true });
   const taught = (await core.buildMessages('resp_teach', '我教你啊，猫其实怕黄瓜'))
     .slice(1).map(m => String(m.content || '')).join('\n');
   t('别人教她 → 注入「学到了」', taught.includes(TEACH));
@@ -242,7 +242,7 @@ function docFirstRules() {
     '3-接龙结束词.md 没被读进提示词，她自己不知道往哪收');
 
   const say = async (key, text) => {
-    core.setTurn(key, { uid: '100000000', nick: '凑肥鱼', gid: '100000000', atMe: true });
+    core.setTurn(key, { uid: '1000001002', nick: '凑肥鱼', gid: '1000001000', atMe: true });
     const msgs = await core.buildMessages(key, text);
     return msgs.slice(1).map(m => String(m.content || '')).join('\n');
   };
@@ -295,13 +295,13 @@ function docFirstRules() {
   // 老逻辑 addressedToMe=false → 整段约定不注入 → 她只会解释「什么意思」，白纠正了两次。
   // 口径（不破坏 2026-10-23 那条）：句尾记号类（sig 非空）仍只在他真跟她说话时注入；
   // 「碰到 X 就 Y」这类规矩（sig 为空）只要这一轮接的是他的话，就注入。
-  const BAI = '100000000';
-  // 键是 'platform:id'（qq:100000000），不拿裸号硬比；按白的键集找他名下的约定
+  const BAI = '1000001003';
+  // 键是 'platform:id'（qq:1000001003），不拿裸号硬比；按白的键集找他名下的约定
   const baiKeys = (core._whoKeys(BAI).keys || []);
   const hasBai = (core.readPromises() || []).some(x => x.qq
     && baiKeys.indexOf(String(x.qq)) >= 0 && /够童/.test(String(x.text)));
   if (hasBai) {
-    core.setTurn('persona_selfcheck_bai', { uid: BAI, nick: '白', gid: '100000000', chime: true, atMe: false });
+    core.setTurn('persona_selfcheck_bai', { uid: BAI, nick: '白', gid: '1000001004', chime: true, atMe: false });
     const baiTail = (await core.buildMessages('persona_selfcheck_bai', '何意味？'))
       .slice(1).map(m => String(m.content || '')).join('\n');
     t('白没@她、她自己接话 → 仍带出「够童」', baiTail.includes('够童'),
@@ -312,7 +312,7 @@ function docFirstRules() {
   }
 
   // 老口径不能破：句尾记号类（Ciallo）不能因为她主动接火丁的话就带出来
-  core.setTurn('persona_selfcheck_qh2', { uid: '100000000', nick: '企鹅火丁', gid: '100000000', chime: true, atMe: false });
+  core.setTurn('persona_selfcheck_qh2', { uid: '1000001001', nick: '企鹅火丁', gid: '1000001000', chime: true, atMe: false });
   const qh2 = (await core.buildMessages('persona_selfcheck_qh2', '今天好热'))
     .slice(1).map(m => String(m.content || '')).join('\n');
   t('火丁没@她、她自己接话 → 不带 Ciallo（老口径没破）', !qh2.includes(HIS_SIG));

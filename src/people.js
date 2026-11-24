@@ -50,7 +50,7 @@ const FRIEND_AT = 20;
 const ROLES = ['master', 'onii', 'friend', 'known', 'stranger'];
 const ROLE_LABEL = { master: '主人', onii: '欧尼酱', friend: '朋友', known: '认识的人', stranger: '陌生人' };
 /* 主人的号 / 欧尼酱的号：5 秒缓存一次（all() 一次要判 160 多人，别每人读 4 个配置文件） */
-let _idCfg = { at: 0, masterQQs: [], oniiQQ: '100000000' };
+let _idCfg = { at: 0, masterQQs: [], oniiQQ: '10000000003' };
 function idConfig() {
   if (_idCfg.at && Date.now() - _idCfg.at < 5000) return _idCfg;
   try {
@@ -58,9 +58,9 @@ function idConfig() {
     _idCfg = {
       at: Date.now(),
       masterQQs: [cfg.masterQQ].concat(cfg.masters || []).map(String).filter(Boolean),
-      oniiQQ: String(cfg.oniiQQ || '100000000'),
+      oniiQQ: String(cfg.oniiQQ || '1000000003'),
     };
-  } catch { _idCfg = { at: Date.now(), masterQQs: [], oniiQQ: '100000000' }; }
+  } catch { _idCfg = { at: Date.now(), masterQQs: [], oniiQQ: '10000000003' }; }
   return _idCfg;
 }
 function roleOf(pidOrRecord) {
@@ -153,7 +153,7 @@ const clamp = v => Math.max(0, Math.min(MAX, Math.round(Number(v) || 0)));
 const normId = id => String(id == null ? '' : id).trim();
 /* ===== 平台注册表（2026-11-06 她要求「QQ 号也要加前缀，后续加小红书/抖音/小黑盒都不能有问题」）=====
  * 加一个平台**只改这张表**：别名归一、落盘键（'qq:123' / 'xhs:abc'）、面板和客户端显示名全跟着走。
- *   key   = 落盘用的短标识（'qq:100000000' 里的 qq，字母小写）
+ *   key   = 落盘用的短标识（'qq:1033830163' 里的 qq，字母小写）
  *   label = 显示给人看的中文名
  *   digit = 账号 id 是否必须是纯数字（QQ / B站 UID 是数字；小红书号、抖音号可能带字母）
  * 不在这张表里的平台也能用（key 原样小写保留、id 允许字母数字），只是显示名等于 key。 */
@@ -699,8 +699,8 @@ function nameEntriesOf(pid, opt) {
   const aid = o.aid ? normId(o.aid) : '';
   const p = get(pid);
   if (!p) return [];
-  /* 同名合并来源（2026-11-22 她令）：「抖抖海月水母（群100000000的名片）」和
-   * 「（B站昵称）」是同一个名字 → 合成一项「抖抖海月水母（B站昵称、群100000000的名片）」，
+  /* 同名合并来源（2026-11-22 她令）：「抖抖海月水母（群467015277的名片）」和
+   * 「（B站昵称）」是同一个名字 → 合成一项「抖抖海月水母（B站昵称、群467015277的名片）」，
    * 不能因为去重把后一个来源丢掉（那看起来就「名字没显示全」）。 */
   const out = [];
   const byName = new Map();
@@ -888,7 +888,7 @@ function platOfId(id) {
   return /^\d+$/.test(normId(id)) ? 'qq' : '';
 }
 /* ===== 落盘键（2026-11-06 她定：「QQ 号也要加这个前缀，后续加平台都不能有问题」）=====
- * 统一成 'platform:id' —— qq:100000000 / bili:100000000 / xhs:abc123 / douyin:xyz。
+ * 统一成 'platform:id' —— qq:1033830163 / bili:434882781 / xhs:abc123 / douyin:xyz。
  * 好处：任何平台的号都不会互相撞（B站 9 位 UID 和某个 QQ 号长得一样也不会串），
  * 以后加平台只是多一条注册表，读写代码一行不动。
  * 传进来裸号也能认：档案里有就按档案的平台，没有按 QQ（老数据的键就是 QQ 号）。 */
@@ -900,7 +900,7 @@ function keyOf(uid) {
   const plat = platOfId(raw);
   return plat ? plat + ':' + raw : raw;   // 认不出平台就原样留着，不冒充成 QQ
 }
-/* 一条约定/事实/日子挂在谁名下，给人看的名字：'白（B站 100000000）'、'火丁（QQ 100000000）'。
+/* 一条约定/事实/日子挂在谁名下，给人看的名字：'白（B站 434882781）'、'火丁（QQ 975052019）'。
  * 面板和客户端都用它，省得各处再拼一遍平台名。 */
 function labelOfKey(key) {
   const k = String(key == null ? '' : key).trim();
@@ -938,7 +938,7 @@ function mainAccount(pid) {
  * 这些号是 selfcheck 基准、tests/test-all、/tmp 里的禁词对照脚本拿来构造提示词用的；
  * 以前它们每跑一次就在 people.json 里造一个人，她在面板删掉又被造回来。
  * 拦在 ensure/touch 这个唯一建档口上，比在每个脚本里各自防更可靠。 */
-const DEMO_ACC = /^(?:123456|666666|777777|555555|100000000|(?:9100|9300)\d{2})$/;
+const DEMO_ACC = /^(?:123456|666666|777777|555555|9999999999|(?:9100|9300)\d{2})$/;
 const isDemoAcc = id => DEMO_ACC.test(String(id || ''));
 
 function ensure(platform, id, opts) {

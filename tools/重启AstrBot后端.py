@@ -22,7 +22,7 @@ import subprocess
 import sys
 import time
 
-APP = "/Users/zhengbowen/Applications/AstrBot.app/Contents/Resources/backend"
+APP = "~/Applications/AstrBot.app/Contents/Resources/backend"
 PY = f"{APP}/python/bin/python3"
 MAIN = f"{APP}/app/main.py"
 WEBUI = f"{APP}/../webui"

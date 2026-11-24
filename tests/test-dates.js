@@ -21,7 +21,7 @@ process.chdir(ROOT);
 const DATES = path.join(ROOT, 'src', 'data', 'dates.json');
 const PEOPLE = path.join(ROOT, 'src', 'data', 'people.json');
 const WLOG = path.join(ROOT, 'src', 'data', 'bot-writes.jsonl');
-const TMP_QQ = '100000000';          // 测试专用号，测完从 people.json 里删掉
+const TMP_QQ = '1000001000';          // 测试专用号，测完从 people.json 里删掉
 
 let pass = 0, fail = 0;
 const t = (name, ok, why) => {
@@ -109,10 +109,10 @@ function restore() {
       const msgs = await core.buildMessages(k, text);
       return msgs.map(x => String(x.content || '')).join('\n');
     };
-    let all = await build('k_meet', { uid: TMP_QQ, gid: 100000000, nick: '测试小号', atMe: true }, '在吗');
+    let all = await build('k_meet', { uid: TMP_QQ, gid: 1000001001, nick: '测试小号', atMe: true }, '在吗');
     t('跟他聊 → 带「你和眼前这个人的日子」', all.includes('你和眼前这个人的日子'));
     t('  且写明第一次见面日期', all.includes('第一次见面是 ' + dates.todayStr()));
-    all = await build('k_other', { uid: '100000000', gid: 100000000, nick: '路人', atMe: true }, '在吗');
+    all = await build('k_other', { uid: '1000001001', gid: 1000001001, nick: '路人', atMe: true }, '在吗');
     t('跟没记录的人聊 → 不出现这段', !all.includes('你和眼前这个人的日子'));
     const sp = String(core.systemPrompt() || '');
     t('她自己的日子在常驻提示词里', sp.includes('2026-10-21') && sp.includes('2026-10-28'));

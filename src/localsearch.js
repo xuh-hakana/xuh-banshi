@@ -89,7 +89,7 @@ function namesOf(uid) {
 }
 
 /* 显示名 → QQ 号（全量，带 mtime 缓存）。用来在句子里认出「这句话在说谁」。
- * 「非神说了你几次脑子空空」→ 认出「非神」= 100000000。 */
+ * 「非神说了你几次脑子空空」→ 认出「非神」= 2770187994。 */
 let _idx = { mt: 0, map: null };
 function allNameIndex() {
   let mt = 0;

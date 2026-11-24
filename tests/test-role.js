@@ -37,9 +37,9 @@ const PEOPLE_FILE = path.join(ROOT, 'src', 'data', 'people.json');
 const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
 
 (async () => {
-  const masterPid = P.findByAccount('qq', '100000000');
-  const oniiPid = P.findByAccount('qq', '100000000');
-  const friendPid = P.findByAccount('qq', '100000000');
+  const masterPid = P.findByAccount('qq', '1000001000');
+  const oniiPid = P.findByAccount('qq', '1000001001');
+  const friendPid = P.findByAccount('qq', '1000001002');
 
   console.log('① 身份怎么算');
   ok('主人号 → 主人', () => assert.strictEqual(P.roleOf(masterPid), 'master'));
@@ -60,7 +60,7 @@ const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
     const msgs = await core.buildMessages(k, text);
     return msgs.map(x => String(x.content || '')).join('\n');
   };
-  const GID = '100000000';
+  const GID = '1000001003';
   // 「现在跟你说话的是谁」单独截出来判断：群名片那段也写着身份：主人（她自己那张卡），
   // 整段搜会把「群友不是主人」误判成失败。
   const whoBlock = t => {
@@ -69,7 +69,7 @@ const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
     const j = String(t).indexOf('\n## ', i + 3);
     return j < 0 ? String(t).slice(i) : String(t).slice(i, j);
   };
-  const asMaster = await build('krole_m', { uid: '100000000', gid: GID, nick: '那就是死了已被移出群聊', atMe: true, isMaster: true }, '在吗');
+  const asMaster = await build('krole_m', { uid: '1000001000', gid: GID, nick: '那就是死了已被移出群聊', atMe: true, isMaster: true }, '在吗');
   ok('主人那一轮：身份：主人', () => assert.ok(asMaster.includes('身份：主人'), '没找到「身份：主人」'));
   ok('主人那一轮：名字是「虚幻」', () => assert.ok(whoBlock(asMaster).includes('虚幻'), '没找到名字'));
   // 同名提醒只在「她的真名 = 机器人名」时出现；2026-11-22 晚她把真名改成「柚酱…」了，没命中就跳过
@@ -88,7 +88,7 @@ const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
     assert.ok(!b.includes('他还叫'), '他还叫行还在');
   });
 
-  const asOther = await build('krole_o', { uid: '100000000', gid: GID, nick: '那就是死了', atMe: true }, '在吗');
+  const asOther = await build('krole_o', { uid: '1000001002', gid: GID, nick: '那就是死了', atMe: true }, '在吗');
   ok('群友那一轮：不是主人', () => assert.ok(!whoBlock(asOther).includes('身份：主人'), '群友被当成了主人'));
   ok('群友那一轮：名字行里有本群名片', () => assert.ok(whoBlock(asOther).includes('那就是死了（这个群的群名片）'), '没找到群友名片'));
   ok('名字排序：主人的叫法排在当前可见名前', () => {
@@ -104,7 +104,7 @@ const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
   ok('主人那一轮：可喊行不含别群名片', () => {
     const line = lineOf(whoBlock(asMaster), '喊他用的名字（按顺序）');
     assert.ok(line, '没有可喊行');
-    assert.ok(!line.includes('一抹多'), '把「一抹多」（群100000000的名片）当成能喊的名字了：' + line);
+    assert.ok(!line.includes('一抹多'), '把「一抹多」（群1000001004的名片）当成能喊的名字了：' + line);
     assert.ok(!line.includes('群女仆机器人'), '把第二个 QQ 号的名片当成能喊的名字了：' + line);
   });
   ok('主人那一轮：别群名片进了「只用来认人、不许喊」', () => {
@@ -112,22 +112,22 @@ const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
     assert.ok(line.includes('一抹多'), '没把「一抹多」列进只认：' + line);
   });
   ok('nick.nameFor 按当前群选名字，不串群', () => {
-    const who = '100000000';                        // p_mw008u415：两个群两张不同名片，没有真名
-    assert.strictEqual(nick.nameFor(who, { gid: '100000000', nick: '抖抖海月水母' }), '抖抖海月水母');
-    assert.strictEqual(nick.nameFor(who, { gid: '100000000', nick: '好想成为人类' }), '好想成为人类');
+    const who = '1000001005';                        // p_mw008u415：两个群两张不同名片，没有真名
+    assert.strictEqual(nick.nameFor(who, { gid: '1000001006', nick: '抖抖海月水母' }), '抖抖海月水母');
+    assert.strictEqual(nick.nameFor(who, { gid: '1000001003', nick: '好想成为人类' }), '好想成为人类');
   });
 
   const asStranger = await build('krole_s', { uid: '777777', gid: GID, nick: '新来的', atMe: true }, '在吗');
   ok('从没见过的号 → 身份：陌生人', () => assert.ok(asStranger.includes('身份：陌生人'), '没判陌生人'));
   ok('陌生人那段带「别装熟」', () => assert.ok(asStranger.includes('别装熟'), '没有陌生人应对说明'));
 
-  const asMaster2 = await build('krole_m2', { uid: '100000000', gid: GID, nick: '那就是死了已被移出群聊', atMe: true, isMaster: true }, '在吗');
+  const asMaster2 = await build('krole_m2', { uid: '1000001000', gid: GID, nick: '那就是死了已被移出群聊', atMe: true, isMaster: true }, '在吗');
   ok('群名片那段每个人带身份', () => assert.ok(/群名片（\d+ 人）[\s\S]*身份：/.test(asMaster2), '群名片段没有身份'));
 
   console.log('③ 群名片不再把真名字当脏数据洗掉');
   ok('「那就是死了已被移出群聊」是她的真名片，原样留着', () => {
     const p = P.get(masterPid);
-    const a = (p.accounts || []).find(x => String(x.id) === '100000000');
+    const a = (p.accounts || []).find(x => String(x.id) === '1000001000');
     assert.strictEqual(a.cards[GID], '那就是死了已被移出群聊');
   });
   ok('只有整条就是系统提示才丢', () => {
@@ -174,32 +174,32 @@ const backup = fs.readFileSync(PEOPLE_FILE, 'utf8');
     assert.ok(al.indexOf('那就是死了已被移出群聊') < 0, '当前可见名被算成代称');
     assert.ok(al.indexOf('主人（虚幻）') >= 0 || al.length > 0, '代称空了');
   });
-  ok('nick.nameFor 主人 → 主人（身份即称呼）', () => assert.strictEqual(nick.nameFor('100000000', { uid: '100000000' }, ''), '主人'));
-  ok('nick.nameFor 欧尼酱 → 欧尼酱', () => assert.strictEqual(nick.nameFor('100000000', { uid: '100000000' }, ''), '欧尼酱'));
+  ok('nick.nameFor 主人 → 主人（身份即称呼）', () => assert.strictEqual(nick.nameFor('1000001000', { uid: '1000001000' }, ''), '主人'));
+  ok('nick.nameFor 欧尼酱 → 欧尼酱', () => assert.strictEqual(nick.nameFor('1000001001', { uid: '1000001001' }, ''), '欧尼酱'));
   ok('nick.nameFor 群友按「主人叫法」喊，不喊代称', () => {
     // 2026-11-22 她令：主人喊他「大萌新」，虚幻跟着这么喊（真名空时主人叫法排在可见名前面）
-    const n = nick.nameFor('100000000', { uid: '100000000', gid: GID, nick: '那就是死了' }, '');
+    const n = nick.nameFor('1000001002', { uid: '1000001002', gid: GID, nick: '那就是死了' }, '');
     assert.ok(/^(大萌新|那就是死了)(酱)?$/.test(n), '喊成了：' + n);
-    assert.strictEqual(P.masterCallOf(P.findByAccount('qq', '100000000')), '大萌新');
+    assert.strictEqual(P.masterCallOf(P.findByAccount('qq', '1000001002')), '大萌新');
   });
   ok('名字三项并列：可见名 / 主人叫法 / 真名', () => {
-    const pid = P.findByAccount('qq', '100000000');
+    const pid = P.findByAccount('qq', '1000001002');
     const old = P.realNameOf(pid);
     P.setName(pid, '小死');
-    const names = P.callNamesOf(pid, GID, 'qq', '100000000');
+    const names = P.callNamesOf(pid, GID, 'qq', '1000001002');
     assert.deepStrictEqual(names.slice(0, 3), ['小死', '大萌新', '那就是死了']);
     P.setName(pid, old);   // 还原（原来没真名 → 清空）
   });
   ok('对话里说「我是女的」→ 改成女', () => {
-    const pid = P.findByAccount('qq', '100000000');
+    const pid = P.findByAccount('qq', '1000001002');
     const before = P.sexOf(pid);
-    core.noteSexFromText('100000000', '我是女生，别叫我哥');
+    core.noteSexFromText('1000001002', '我是女生，别叫我哥');
     assert.strictEqual(P.sexOf(pid), 'female');
     P.setSex(pid, before, 'confirmed');    // 还原
   });
   ok('对话里说「我是男的」→ 确认是男', () => {
-    const pid = P.findByAccount('qq', '100000000');
-    core.noteSexFromText('100000000', '我是男的');
+    const pid = P.findByAccount('qq', '1000001002');
+    core.noteSexFromText('1000001002', '我是男的');
     assert.strictEqual(P.sexOf(pid), 'male');
     assert.strictEqual(P.sexSrcOf(pid), 'confirmed');
   });

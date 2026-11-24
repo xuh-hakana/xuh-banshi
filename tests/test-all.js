@@ -185,7 +185,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
 
   try {
     // 录入一条没总结的话题
-    const add = await post('/api/topic/add', { to: 'log', type: 'quote', who: '群友甲', scope: '群100000000', text: '必须选一个，不选拉倒' });
+    const add = await post('/api/topic/add', { to: 'log', type: 'quote', who: '群友甲', scope: '群1000001000', text: '必须选一个，不选拉倒' });
     t('话题日志录入', !!add.ok && add.item.state === 'raw' && !add.item.parent);
     const rawId = add.item.id;
 
@@ -328,8 +328,8 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('带上下文的长句不拦', qq._EMPTY_ANS.test('这个我记不清了，不过蒙脱石散好像是治肚子的') === false);
 
   // ===== 8. 真 @：回复里的 @QQ号 转成 OneBot at 段（主人 2026-10-22：可以@人，但要真@）=====
-  const seg1 = qq._buildAtSegments('@100000000 主人你在哪');
-  t('真@：拆出 at 段', Array.isArray(seg1) && seg1[0].type === 'at' && seg1[0].data.qq === '100000000', JSON.stringify(seg1));
+  const seg1 = qq._buildAtSegments('@1000001001 主人你在哪');
+  t('真@：拆出 at 段', Array.isArray(seg1) && seg1[0].type === 'at' && seg1[0].data.qq === '1000001001', JSON.stringify(seg1));
   t('真@：后半文字完整', seg1[1].type === 'text' && seg1[1].data.text === ' 主人你在哪', JSON.stringify(seg1));
   t('真@：没有@返回 null', qq._buildAtSegments('普通一句话') === null);
   t('真@：太短的号不认', qq._buildAtSegments('@123 你好') === null);
@@ -337,10 +337,10 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   // ===== 9. 说话风格：带 @ 的样本剥掉号照样记（主人 2026-10-22 定）=====
   const style = require('../src/style');
   const n0 = style.stats().samples;
-  t('剥号记录', style.learn('@100000000 测试剥号样本QAZ') === true
+  t('剥号记录', style.learn('@1000001001 测试剥号样本QAZ') === true
     && (() => { const a = JSON.parse(fs.readFileSync('data/style-samples.json', 'utf8')); return a[a.length - 1].t === '测试剥号样本QAZ'; })());
-  t('剥号后去重', style.learn('@100000000 测试剥号样本QAZ') === false);
-  t('纯@号不收', style.learn('@100000000') === false && style.stats().samples >= n0);
+  t('剥号后去重', style.learn('@1000001001 测试剥号样本QAZ') === false);
+  t('纯@号不收', style.learn('@1000001001') === false && style.stats().samples >= n0);
 
 
   // ===== 11. 回声格式清理 v2（主人 2026-10-22 重做：允许合理复读，只治「某某说：」转述格式）=====
@@ -370,9 +370,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   // —— 带 @ 前缀的复读也拦（2026-10-23 实测漏过：群友喊她的消息带「@虚幻…」前缀，
   //    @名字把历史文本撑长，长度比掉下 0.8 → 漏拦。修法：比对前双方都剥 @ 段）——
   const kAt = 'test_repeats_at';
-  core.pushHist(kAt, 'user', '元囮家的乙说: @虚幻之海的电子幽灵 哼，那就都收摊，尾巴一卷，各睡各的～');
+  core.pushHist(kAt, 'user', '元囮家的大肥鱼说: @虚幻之海的电子幽灵 哼，那就都收摊，尾巴一卷，各睡各的～');
   t('历史带@前缀的整句照抄拦', qq2._repeatsOthers(kAt, '哼，那就都收摊，尾巴一卷，各睡各的～') === true);
-  t('她的回复自带@对方前缀也拦', qq2._repeatsOthers(kAt, '@元囮家的乙 哼，那就都收摊，尾巴一卷，各睡各的～') === true);
+  t('她的回复自带@对方前缀也拦', qq2._repeatsOthers(kAt, '@元囮家的大肥鱼 哼，那就都收摊，尾巴一卷，各睡各的～') === true);
   t('回复内容不同（只是被@）放行', qq2._repeatsOthers(kAt, '才不睡呢，我再玩会儿') === false);
 
   // —— 逐字复读 → 大概率照原回复答（主人 2026-10-22 改定）——
@@ -385,15 +385,15 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
 
   // —— 身份铁律兜底（真人真事：主人说「你是虚幻，不是大饮尽酱」她回「我是大饮尽酱呀」）——
   t('身份兜底：我是大饮尽酱 → 我是虚幻', core.polish('主人，我是大饮尽酱呀！', null).indexOf('我是虚幻') >= 0);
-  t('身份兜底：叫我乙 → 叫我虚幻', core.polish('嘻嘻，叫我乙就好', null).indexOf('叫我虚幻') >= 0);
+  t('身份兜底：叫我大肥鱼 → 叫我虚幻', core.polish('嘻嘻，叫我大肥鱼就好', null).indexOf('叫我虚幻') >= 0);
   t('身份兜底不误伤「我不是大饮尽酱」', core.polish('我不是大饮尽酱哦', null).indexOf('我是虚幻') < 0);
 
   // —— 比较题优先查口味库（主人 2026-10-22：库里有的按喜好站队，都没有才不分高下）——
   const TASTE_OLD = fs.readFileSync('data/人物喜好.md', 'utf8');
-  fs.writeFileSync('data/人物喜好.md', TASTE_OLD + '\n## 测试主人（100000000）\n\n### 喜欢（确定）\n\n- 型月 （2026-10-22 · 测试）\n', 'utf8');
-  const vs1 = core.taste.vsStance('型月和东方谁厉害', '100000000');
+  fs.writeFileSync('data/人物喜好.md', TASTE_OLD + '\n## 测试主人（1000001001）\n\n### 喜欢（确定）\n\n- 型月 （2026-10-22 · 测试）\n', 'utf8');
+  const vs1 = core.taste.vsStance('型月和东方谁厉害', '1000001001');
   t('比较题：库里有的按口味站队', vs1.mode === 'lib' && vs1.liked.indexOf('型月') >= 0, JSON.stringify(vs1));
-  const vs2 = core.taste.vsStance('波比和灯塔谁厉害', '100000000');
+  const vs2 = core.taste.vsStance('波比和灯塔谁厉害', '1000001001');
   t('比较题：都没记录过 → 不分高下', vs2.mode === 'none');
 
   // —— 话题翻篇（主人 2026-10-22：说过的话题 0.5~5 天不反复说）——
@@ -409,9 +409,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   // —— 开场复读剥离（真人真事：她把对方原话当第一行复读一遍）——
   const kEcho3 = 'test_firstline';
   core.setTurn(kEcho3, { text: '这个表情是这么用的吗😭' });
-  const pe1 = core.polish('这个表情是这么用的吗😭\n呜呜呜，乙，你被偷表情了呀', kEcho3);
+  const pe1 = core.polish('这个表情是这么用的吗😭\n呜呜呜，大肥鱼，你被偷表情了呀', kEcho3);
   t('首行逐字复读对方原话 → 剥掉', pe1.indexOf('这么用的吗') < 0 && pe1.indexOf('被偷表情') >= 0, pe1);
-  const pe2 = core.polish('这个表情是这么用的吗😭，乙你太过分了', kEcho3);
+  const pe2 = core.polish('这个表情是这么用的吗😭，大肥鱼你太过分了', kEcho3);
   t('单行含对方的话不误伤', pe2.length > 5, pe2);
   core.setTurn(kEcho3, { text: '别的什么话' });
   const pe3 = core.polish('正常回复第一行\n第二行', kEcho3);
@@ -419,7 +419,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
 
   // —— 笑点解析 → 新梗入库（带原文、@ 清洗；主人 2026-10-22 定）——
   const MEME_OLD = fs.readFileSync('data/网络热梗.md', 'utf8');
-  core._recordXiaodianMeme('@元囮家的乙 又开始带节奏了',
+  core._recordXiaodianMeme('@元囮家的大肥鱼 又开始带节奏了',
     '解析到的可用内容：带节奏\n对应的梗：带节奏\n出处：电竞圈\n含义：故意带风向带大家情绪\n令人忍俊不禁喵～');
   const memeNow = fs.readFileSync('data/网络热梗.md', 'utf8');
   t('笑点解析新梗入库', memeNow.indexOf('## 带节奏') >= 0, '');
@@ -433,7 +433,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('常用文件夹里有图（开心.jpg 已移入）', fs.existsSync('data/stickers/常用/开心.jpg'));
 
   // ===== 11c. 非@回复群级节流（主人 2026-10-22：每隔 15~20 条消息才触发一次；热度模式 4~10 条）=====
-  const G = 100000000;
+  const G = 1000001002;
   qq2._grpAutoConsume(G);   // 重置：need 随机 15~20
   let fired = -1, i;
   for (i = 1; i <= 30; i++) { if (qq2._grpAutoTick(G)) { fired = i; break; } }
@@ -456,9 +456,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
 
   // —— 复读链跟风（主人 2026-10-22 定）——
   // 2026-10-23 修：这里原来用裸键 'ctest' 喂数据，和 noteTalk 真实写的 'g'+群号 不是同一个键，
-  // 于是「群友复读了她不跟」的真 bug 被测试掩盖了（真事：群 100000000 九人复读没动）。
+  // 于是「群友复读了她不跟」的真 bug 被测试掩盖了（真事：群 1000001003 九人复读没动）。
   // 现在必须用真实形态喂：'g'+群号 写入、裸群号查询。
-  const CG = 100000000;
+  const CG = 1000001003;
   qq2._noteTalk('g' + CG, '路人甲', 1, '大家一起来复读这句话', false);
   qq2._noteTalk('g' + CG, '路人乙', 2, '大家一起来复读这句话', false);
   t('复读链：真实群消息键（g+群号）下同句 ≥2 次 → 可以跟', qq2._chainJoinAllowed(CG, '大家一起来复读这句话') === true);
@@ -473,7 +473,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
       && src.includes("chainJoined.set('g' + ev.group_id + '#'");
   })());
   t('复读链：她自己说过这句就不跟（不自导自演）', (() => {
-    qq2._noteTalk('g5566', '她', '100000000', '这句是她说过的', true);
+    qq2._noteTalk('g5566', '她', '1000001004', '这句是她说过的', true);
     qq2._noteTalk('g5566', '路人甲', 1, '这句是她说过的', false);
     qq2._noteTalk('g5566', '路人乙', 2, '这句是她说过的', false);
     return qq2._chainJoinAllowed(5566, '这句是她说过的') === false;
@@ -483,7 +483,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('表情名：图中有一个穿着蓝色 → 穿着蓝色', qq2._stickerName('图中有一个穿着蓝色') === '穿着蓝色');
   t('表情名：图中是一只白猫 → 白猫', qq2._stickerName('图中是一只白猫') === '白猫');
   t('表情名：这是一张黑白图片 → 黑白图片', qq2._stickerName('这是一张黑白图片') === '黑白图片');
-  t('多主人号：cfg.masters 里的号也算主人，元囮不算', qq2._isMasterUid(100000000) === true && qq2._isMasterUid(100000000) === true && qq2._isMasterUid(100000000) === false);
+  t('多主人号：cfg.masters 里的号也算主人，元囮不算', qq2._isMasterUid(1000001005) === true && qq2._isMasterUid(1000001001) === true && qq2._isMasterUid(1000001006) === false);
 
   // ===== 11.5 即时记忆（主人 2026-10-22：群内上下文 50 条，问「刚才谁说」就翻）=====
   qq2._noteTalk('gtest', '路人甲', 111, '我刚说了一句独家的', false);
@@ -494,9 +494,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('即时记忆名字清理', qq2._stickerName('［图：一只蓝色的猫，坐着］') === '蓝色的猫坐着' && !/[\\/:*?"<>|]/.test(qq2._stickerName('a/b\\c')));
 
   // ===== 12. 学习规则 v2 + 定时转发（主人 2026-10-22 定）=====
-  t('测试群 100000000 不学', qq2._styleGate({ group_id: 100000000 }, true, false, '今天天气不错') === false);
+  t('测试群 1000001007 不学', qq2._styleGate({ group_id: 1000001007 }, true, false, '今天天气不错') === false);
   t('其他群学', qq2._styleGate({ group_id: 123456 }, true, false, '今天天气不错') === true);
-  t('@ 与否无关（@ 后正常对话也收）', qq2._styleGate({ group_id: 123456 }, true, false, '@100000000 你看这个') === true);
+  t('@ 与否无关（@ 后正常对话也收）', qq2._styleGate({ group_id: 123456 }, true, false, '@1000001008 你看这个') === true);
   t('私聊不学', qq2._styleGate({ group_id: 0 }, true, true, '今天天气不错') === false);
   t('骰子指令不学', qq2._styleGate({ group_id: 123456 }, true, false, '.r 1d100') === false);
   t('非主人不学', qq2._styleGate({ group_id: 123456 }, false, false, '今天天气不错') === false);
@@ -510,7 +510,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   // 学习规则 v3（主人 2026-10-22）：回复/@ 类样本最优先 + 带上下文
   t('回复类样本：kind/ctx 一起存', style.learn('他才不是只会砸', { kind: 'reply', ctx: '前三部的奎托斯跟四代哪个厉害', g: '123456' }) === true
     && JSON.parse(fs.readFileSync('data/style-samples.json', 'utf8')).some(x => x.kind === 'reply' && x.ctx === '前三部的奎托斯跟四代哪个厉害'));
-  t('@类样本：ctx 里的 @ 号和图占位剥掉', style.learn('这才是真强', { kind: 'at', ctx: '@100000000 ［图：一只猫］你说谁强', g: '123456' }) === true
+  t('@类样本：ctx 里的 @ 号和图占位剥掉', style.learn('这才是真强', { kind: 'at', ctx: '@1000001001 ［图：一只猫］你说谁强', g: '123456' }) === true
     && JSON.parse(fs.readFileSync('data/style-samples.json', 'utf8')).some(x => x.kind === 'at' && x.ctx === '你说谁强'));
   t('抽样本：回复/@ 类保底一半', (() => {
     // 造 6 条普通 + 上面已有 2 条 kind → 抽 4 条至少 2 条带 kind
@@ -529,11 +529,11 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   // ===== 好感度系统（主人 2026-10-22）：夸赞+1、满100才宝宝、过60进喜好表「喜欢（人物）」 =====
   const favor = require('../src/favor');
   const nickT = require('../src/nick');
-  nickT.init({ masterQQ: '100000000', oniiQQ: '100000000', people: { '100000000': '德川', '100000000': '元囮' } });
+  nickT.init({ masterQQ: '10000000002', oniiQQ: '10000000003', people: { '1000001009': '德川', '1000001006': '元囮' } });
   favor.set('666666', 100);
   t('好感满100→日常叫宝宝', nickT.nameFor('666666', { nick: '小测试' }, '你好') === '小测试宝宝');
   // 名字规则（主人 2026-10-22）：确认了名字就优先叫名字，群名片算别称
-  t('确认名优先于群名片', nickT.nameFor('100000000', { nick: '我跟死肥鱼不共戴天' }, '嗯嗯好的') === '德川');
+  t('确认名优先于群名片', nickT.nameFor('1000001009', { nick: '我跟死肥鱼不共戴天' }, '嗯嗯好的') === '德川');
 
   // ===== 口味同步：只能用一份，面板标题/小节必须和代码对得上（主人 2026-10-23 定）=====
   const tasteMd = fs.readFileSync('data/人物喜好.md', 'utf8');
@@ -548,7 +548,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('主人的副号口味归一到主号那一节（不另开一节）',
     !!other && owner2._tasteOwner(other, '群主号').uid === String(cfgM.masterQQ)
     && owner2._tasteOwner(String(cfgM.masterQQ), '主人').uid === String(cfgM.masterQQ)
-    && owner2._tasteOwner('100000000', '德川').uid === '100000000');
+    && owner2._tasteOwner('1000001009', '德川').uid === '1000001009');
   t('面板上没有第二份口味：主人的每个号都不会单独成节', (() => {
     const qqs = new Set([String(cfgM.masterQQ)].concat((cfgM.masters || []).map(String)).filter(Boolean));
     const secs = [...tasteMd.matchAll(/^##\s+.+?（(\d{4,12})）\s*$/gm)].map(m => m[1]);
@@ -563,7 +563,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   // 纠正本：记录 + 读回
   const coreT = require('../src/core');
   const corrBak = fs.existsSync('data/corrections.jsonl') ? fs.readFileSync('data/corrections.jsonl', 'utf8') : '';
-  coreT.recordCorrection('夸在哪，我去，别记错了啊', '你夸我话痨呀~', '100000000');
+  coreT.recordCorrection('夸在哪，我去，别记错了啊', '你夸我话痨呀~', '1000001001');
   const corrTxt = coreT.correctionLines(6);
   t('纠正本能记能读', corrTxt.includes('别记错了啊') && corrTxt.includes('话痨'));
   t('纠正本带上下文', corrTxt.includes('你夸我话痨呀'));
@@ -594,13 +594,13 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('qzoneComment 已导出（转发动态的感想）', typeof core.qzoneComment === 'function');
   t('称呼表没有主人也没有垃圾条目', (() => {
     // 777777 是前面好感度用例自己学进去的（结尾 restore 会还原），不算真垃圾
-    // 100000000 是元囮（主人 2026-10-22 确认的合法群友），不在垃圾名单里
+    // 1000001006 是元囮（主人 2026-10-22 确认的合法群友），不在垃圾名单里
     const st = JSON.parse(fs.readFileSync('data/people-state.json', 'utf8'));
-    const bad = ['100000000', '1', '777', '778', '111111', '100000000'];
+    const bad = ['1000001010', '1', '777', '778', '111111', '1000001011'];
     if (bad.some(k => st[k])) return false;
     // 主人可以有**资料卡名 / 群名片**（主人 2026-10-23：每个群各记一张名片），
     // 但绝不许被当成普通群友记「名字 name」或「代称 alias」——她的称呼永远是「主人」
-    for (const k of ['100000000', '100000000']) {
+    for (const k of ['1000001001', '1000001005']) {
       const r = st[k] || {};
       if (r.name || r.alias) return false;
     }
@@ -608,7 +608,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   })());
   t('master 不会被学进称呼表', (() => {
     const b = fs.readFileSync('data/people-state.json', 'utf8');
-    nickT.nameFor('100000000', { nick: '主人' }, '你好呀');
+    nickT.nameFor('1000001001', { nick: '主人' }, '你好呀');
     return fs.readFileSync('data/people-state.json', 'utf8') === b;
   })());
   t('人设里有搬进去的说话规则（callback/调侃夸/幸好没有/学我说话）', (() => {
@@ -644,11 +644,11 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('复读链只跟人类（不复读 AI：peerAI 名单 + 排除她自己）', (() => {
     const src = fs.readFileSync('connectors/qq.js', 'utf8');
     return src.includes('peerAI.includes(String(x.uid))') && src.includes('!x.bot')
-      && (require('../src/config').load().peerAI || []).includes('100000000');
+      && (require('../src/config').load().peerAI || []).includes('1000001012');
   })());
   t('上线日报发主人群 @ 主人（不再私聊，走保健提醒同一个群）', (() => {
     const src = fs.readFileSync('connectors/qq.js', 'utf8');
-    return /const gid = healthRemind\.targetGroup\(\) \|\| cfg\.testGroup \|\| 100000000/.test(src)
+    return /const gid = healthRemind\.targetGroup\(\) \|\| cfg\.testGroup \|\| 1000001007/.test(src)
       && /sendAction\('send_group_msg', \{ group_id: gid/.test(src)
       && /dailyStats\.run\(/.test(src);
   })());
@@ -687,11 +687,11 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
       && src.includes("if (q === String(ev.user_id || '') || q === String(selfId)) return '@' + q;")
       && !src.includes("if (q === String(ev.user_id)) return '';");
   })());
-  t('config QQ 号与主人确认的一致（100000000 是元囮不在 masters）', (() => {
+  t('config QQ 号与主人确认的一致（1000001006 是元囮不在 masters）', (() => {
     const c = require('../src/config').load();
-    return String(c.masterQQ) === '100000000'
-      && (c.masters || []).map(String).join(',') === '100000000'
-      && String(c.oniiQQ) === '100000000';
+    return String(c.masterQQ) === '1000001001'
+      && (c.masters || []).map(String).join(',') === '1000001005'
+      && String(c.oniiQQ) === '1000001013';
   })());
   t('常用表情包 10 张核心情绪图都在常用文件夹里', (() => {
     // 2026-10-31 第二版：主人会随手改名（悲痛→悲伤、哭→哭1），写死文件名就会假报错。
@@ -810,14 +810,14 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     const q = fs.readFileSync('connectors/qq.js', 'utf8');
     return q.includes('sheJustTalkedTo(k, ev.user_id)') && q.includes('noteHerTarget')
       && /const talkingToMe = isMaster && \(isPrivate \|\| atMe \|\| sheJustTalkedTo/.test(q)
-      && !q.includes('100000000');
+      && !q.includes('1000001004');
   })());
 
   t('乱写不许发（主人抓的真事）：假想对白旁白拦下+重写+不发，笑点解析豁免', (() => {
     const core = require('../src/core');
     const src = fs.readFileSync('core.js', 'utf8');
-    const g1 = core.isGarbageReply('欧尼酱（QQ 100000000）在群里说「诶，怎么呛主人？」，我（虚幻）会回：「欧尼酱怎么啦？你还好吗？」');
-    const g2 = core.isGarbageReply('欧尼酱（QQ 100000000）说了一句你好');
+    const g1 = core.isGarbageReply('欧尼酱（QQ 1000001013）在群里说「诶，怎么呛主人？」，我（虚幻）会回：「欧尼酱怎么啦？你还好吗？」');
+    const g2 = core.isGarbageReply('欧尼酱（QQ 1000001013）说了一句你好');
     const g3 = core.isGarbageReply('我会回：欧尼酱怎么啦');
     const ok1 = core.isGarbageReply('今天天气不错，适合摸鱼');
     const ok2 = core.isGarbageReply('在群里说这个梗的人真搞笑');
@@ -915,27 +915,27 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('暂停/允许：群+时长、解析、到点恢复、主人豁免', (() => {
     const pz = require('../src/pause');
     pz._setOpts && null; // no-op
-    const people = { '100000000': '欧尼酱', '100000000': '主人' };
-    const known = g => g === '100000000';
-    pz.init({ masterQQ: 100000000 });
-    const r1 = pz.parseCommand('暂停群100000000 30分钟', people, known);
-    if (!r1 || !pz.isPaused('group', '100000000')) return false;
+    const people = { '1000001013': '欧尼酱', '1000001001': '主人' };
+    const known = g => g === '1000001014';
+    pz.init({ masterQQ: 10000000002 });
+    const r1 = pz.parseCommand('暂停群1000001014 30分钟', people, known);
+    if (!r1 || !pz.isPaused('group', '1000001014')) return false;
     const r2 = pz.parseCommand('暂停欧尼酱 2小时', people, known);
-    if (!r2 || !pz.isPaused('person', '100000000')) return false;
-    const r3 = pz.parseCommand('允许群100000000', people, known);
-    if (!r3 || pz.isPaused('group', '100000000')) return false;
-    const r4 = pz.parseCommand('暂停100000000', people, known);   // 见过的群号 → 按群停
-    if (!r4 || !pz.isPaused('group', '100000000')) return false;
+    if (!r2 || !pz.isPaused('person', '1000001013')) return false;
+    const r3 = pz.parseCommand('允许群1000001014', people, known);
+    if (!r3 || pz.isPaused('group', '1000001014')) return false;
+    const r4 = pz.parseCommand('暂停1000001014', people, known);   // 见过的群号 → 按群停
+    if (!r4 || !pz.isPaused('group', '1000001014')) return false;
     if (pz._test.parseDur('2小时') !== 7200000 || pz._test.parseDur('1天') !== 86400000) return false;
     // 主人豁免：主人自己被暂停了也照常（遥控权永远在）
-    pz.pause('person', '100000000', 60000);
-    if (pz.blocked(true, '100000000', '')) return false;
-    if (!pz.blocked(true, '100000000', '')) return false;
-    if (!pz.blocked(false, '123', '100000000')) return false;
+    pz.pause('person', '1000001001', 60000);
+    if (pz.blocked(true, '1000001001', '')) return false;
+    if (!pz.blocked(true, '1000001013', '')) return false;
+    if (!pz.blocked(false, '123', '1000001014')) return false;
     pz.parseCommand('允许欧尼酱', people, known);
-    pz.parseCommand('允许100000000', people, known);
+    pz.parseCommand('允许1000001014', people, known);
     pz.parseCommand('允许主人', people, known);
-    return !pz.isPaused('person', '100000000') && !pz.isPaused('group', '100000000') && !pz.isPaused('person', '100000000');
+    return !pz.isPaused('person', '1000001013') && !pz.isPaused('group', '1000001014') && !pz.isPaused('person', '1000001001');
   })());
 
   t('暂停：命令先处理、闸提到复读链/骰子/表情之前（主人 2026-10-23「这个暂停没有用啊」）', (() => {
@@ -952,13 +952,13 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     const pz = require('../src/pause');
     const c = require('../src/config').load();
     pz.init(c);
-    const wasPaused = pz.isPaused('group', '100000000');
-    pz.pause('group', '100000000', 0);
-    const ok = pz.blocked(false, '100000000', '100000000') === true      // 群友 → 闭嘴
-      && pz.blocked(false, String(c.masterQQ), '100000000') === true     // 主人在这个群 → 也闭嘴（以前被豁免）
+    const wasPaused = pz.isPaused('group', '1000001014');
+    pz.pause('group', '1000001014', 0);
+    const ok = pz.blocked(false, '1000001015', '1000001014') === true      // 群友 → 闭嘴
+      && pz.blocked(false, String(c.masterQQ), '1000001014') === true     // 主人在这个群 → 也闭嘴（以前被豁免）
       && pz.blocked(true, String(c.masterQQ), '') === false              // 主人私聊 → 放行
-      && pz.blocked(false, '100000000', '100000000') === false;          // 别的群不受影响
-    if (!wasPaused) pz.allow('group', '100000000');
+      && pz.blocked(false, '1000001015', '1000001007') === false;          // 别的群不受影响
+    if (!wasPaused) pz.allow('group', '1000001014');
     return ok;
   })());
 
@@ -1101,12 +1101,12 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     const s = fs.readFileSync('connectors/qq.js', 'utf8');
     return s.includes('只有 @ 没有正文不发') && s.includes('只有 @ 没有正文，取消发送');
   })());
-  t('带 @ 前缀的消息复读也拦（00:34 复读乙欢迎语场景）', (() => {
+  t('带 @ 前缀的消息复读也拦（00:34 复读大肥鱼欢迎语场景）', (() => {
     const q = require('../src/connectors/qq');
     const core = require('../src/core');
     const k = 'test_at_repeat2';
-    core.pushHist(k, 'user', '元囮家的乙说: @yaksame 师爷好吃黑皮转学体育生的大饮尽');
-    core.pushHist(k, 'user', '元囮家的乙说: 师爷好呀~欢迎欢迎，大半夜的还不睡呀?');
+    core.pushHist(k, 'user', '元囮家的大肥鱼说: @yaksame 师爷好吃黑皮转学体育生的大饮尽');
+    core.pushHist(k, 'user', '元囮家的大肥鱼说: 师爷好呀~欢迎欢迎，大半夜的还不睡呀?');
     return q._repeatsOthers(k, '师爷好呀~欢迎欢迎，大半夜的还不睡呀?') === true;
   })());
 
@@ -1126,8 +1126,8 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   })());
   t('masterAimLine：真@别人 → 带 QQ 号，可直接 @ 回去', (() => {
     const q = require('../src/connectors/qq');
-    const s = q._masterAimLine({ atQ: '100000000', people: { '100000000': '师爷' }, nickOf: '' });
-    return s.includes('师爷') && s.includes('100000000') && s.includes('@100000000');
+    const s = q._masterAimLine({ atQ: '1000001016', people: { '1000001016': '师爷' }, nickOf: '' });
+    return s.includes('师爷') && s.includes('1000001016') && s.includes('@1000001016');
   })());
   t('masterAimLine：手打@昵称（无QQ号）→ 认出名字、对准内容', (() => {
     const q = require('../src/connectors/qq');
@@ -1201,8 +1201,8 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
   t('@ 当名字：@正在跟你说话的人 → 保留真 @；@别人 → 转名字/去掉（v88 撤销「一律不 @」）', (() => {
     const q = require('../src/connectors/qq');
     const ev = { message_type: 'group', user_id: '11111', group_id: 1 };
-    const out = q._atNameConvert('看 @100000000 和 @333444555666 还有 @11111 说的', ev);
-    return out.includes('@11111') && !out.includes('@100000000') && !out.includes('@333444555666')
+    const out = q._atNameConvert('看 @1000001016 和 @333444555666 还有 @11111 说的', ev);
+    return out.includes('@11111') && !out.includes('@1000001016') && !out.includes('@333444555666')
       && out.includes('看') && out.includes('说的');
   })());
   t('剥聊天记录的引用痕迹：↩回复@…↩ 和「已被移出群聊」的群名片不许出现在回复里', (() => {
@@ -1268,8 +1268,8 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     if (!c.includes("fid === '__people'") && !c.includes("openPeople()")) return false;
     if (!c.includes('function renderPeople') || !c.includes('function peopleRow')) return false;
     if (!c.includes('AI 不准改') || !c.includes('挤掉最老') || !c.includes('优先度')) return false;
-    if (!j['100000000'] || j['100000000'].name !== '元囮' || j['100000000'].alias !== '大饮尽') return false;
-    if (!j['100000000'] || j['100000000'].name !== '师爷') return false;
+    if (!j['1000001006'] || j['1000001006'].name !== '元囮' || j['1000001006'].alias !== '大饮尽') return false;
+    if (!j['1000001017'] || j['1000001017'].name !== '师爷') return false;
     return true;
   })());
   t('功能日志不刷屏：自检结论没变不追加（无连续重复条目）；脚本有对比逻辑', (() => {
@@ -1368,9 +1368,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     // 脏字符容错：空格/半角逗号/重复项都能清干净
     if (JSON.stringify(nick.aliasList({ alias: ' 哥哥 、萌梓哥哥，，爸爸 | 妈妈、哥哥' })) !== JSON.stringify(L)) return false;
     // 概率实测 3 万次：名字 > 任何单个代称；代称按优先度递减；5 个都出现过
-    nick.init({ oniiQQ: '100000000', people: {} });
+    nick.init({ oniiQQ: '10000000003', people: {} });
     const cnt = {};
-    for (let i = 0; i < 30000; i++) { const n = nick.nameFor('100000000', { nick: '欧尼酱' }, ''); cnt[n] = (cnt[n] || 0) + 1; }
+    for (let i = 0; i < 30000; i++) { const n = nick.nameFor('1000001013', { nick: '欧尼酱' }, ''); cnt[n] = (cnt[n] || 0) + 1; }
     const keys = Object.keys(cnt);
     if (keys.length < 5) return false;                                       // 名字+4个代称都得能喊到
     const rate = k => keys.filter(x => x === k || x === k + '宝宝').reduce((a, x) => a + cnt[x], 0);
@@ -1382,13 +1382,13 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     nick.init({ people: {} });
     const BAK = fs.readFileSync('data/people-state.json', 'utf8');
     try {
-      nick.addAlias('100000000', '测试甲');
-      nick.addAlias('100000000', '测试乙');
-      nick.addAlias('100000000', '测试丙');
+      nick.addAlias('1000001018', '测试甲');
+      nick.addAlias('1000001018', '测试乙');
+      nick.addAlias('1000001018', '测试丙');
       const j = JSON.parse(fs.readFileSync('data/people-state.json', 'utf8'));
-      const L = nick.aliasList(j['100000000'] || {});
+      const L = nick.aliasList(j['1000001018'] || {});
       if (L.length !== 3 || L[0] !== '测试甲') return false;
-      delete j['100000000'];
+      delete j['1000001018'];
       fs.writeFileSync('data/people-state.json', JSON.stringify(j, null, 1) + '\n', 'utf8');
       return true;
     } finally { fs.writeFileSync('data/people-state.json', BAK, 'utf8'); }
@@ -1472,7 +1472,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     const qq = require('../src/connectors/qq');
     const core = require('../src/core');
     const cfgJ = require('../src/config').load();
-    qq._setCfg(cfgJ); qq._setSelf('100000000');
+    qq._setCfg(cfgJ); qq._setSelf('1000001004');
     const src = '我今天去看了那个展览。人特别多。';
     const ans = '人多是真的多，排队排了半小时。下次得早点去。';
     let hit = 0;
@@ -1483,14 +1483,14 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
       && !qq._splitOut('好呀。', src).includes('|||')
       && !qq._splitOut(ans, '笑点解析。').includes('|||'));
     t('记录触发人：@ 的是别人就认那个人（认人表），@ 她自己不算（v98：aimTargetFrom 返回 {name,uid,msgId}）',
-      (qq._aimTargetFrom('@100000000 你在干嘛', null, 100000000) || {}).name === '德川'
-      && !(qq._aimTargetFrom('@100000000 你好', null, 100000000) || {}).name);
+      (qq._aimTargetFrom('@1000001009 你在干嘛', null, 1000001007) || {}).name === '德川'
+      && !(qq._aimTargetFrom('@1000001004 你好', null, 1000001007) || {}).name);
 
     // 落盘格式：回复 [→X]；主人 @ 别人 = [=主人][→X]（写完还原文件）
     const CHAT = 'data/chat-log.jsonl';
     const oldChat = fs.existsSync(CHAT) ? fs.readFileSync(CHAT, 'utf8') : '';
-    core.logLine('qq', '', '测试回复一句', true, '群100000000', { to: '主人' });
-    core.logLine('qq', '主人', '测试：@德川 你在吗', false, '群100000000', { asHer: true, to: '德川' });
+    core.logLine('qq', '', '测试回复一句', true, '群1000001007', { to: '主人' });
+    core.logLine('qq', '主人', '测试：@德川 你在吗', false, '群1000001007', { asHer: true, to: '德川' });
     const rows = fs.readFileSync(CHAT, 'utf8').slice(oldChat.length).split('\n').filter(Boolean);
     t('落盘：回复行写死触发人 [→主人]', rows.some(l => /\[虚幻\]\[→主人\]/.test(l)));
     t('落盘：主人@别人 → 记成虚幻 + [=主人][→德川]',
@@ -1546,7 +1546,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     })());
     t('群名片只记「他真在的那个群」：没去过的群不建空名片', (() => {
       const nk = require('../src/nick');
-      const Q = '100000000';
+      const Q = '1000001019';
       nk.saveCard(Q, '201', 'A群里的名字', '');
       const c = nk.cardsOf(Q);
       const ok = Object.keys(c.cards).length === 1 && !c.cards['202'];
@@ -1567,7 +1567,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     t('群名片：一个人每个群各一张，资料卡名不被群名片覆盖（主人 2026-10-23 定）', (() => {
       const nk = require('../src/nick');
       nk.init(cfgJ);
-      const Q = '100000000';
+      const Q = '1000001020';
       nk.saveCard(Q, '105', '群一里的名字', '');
       nk.saveCard(Q, '106', '群二里的名字', '');
       nk.saveCard(Q, '', '', '资料卡名');
@@ -1583,9 +1583,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     })());
     t('@ 主人：换成名字「@主人」（不露号）；主人本人说话时保留真 @（v88 撤销「不 @ 主人」）', (() => {
       const q = require('../src/connectors/qq');
-      const ev = { message_type: 'group', user_id: '100000000', group_id: 100000000 };
+      const ev = { message_type: 'group', user_id: '1000001015', group_id: 1000001014 };
       const a = q._atNameConvert('@' + String(cfgJ.masterQQ) + ' 是的，主人', ev);
-      const ev2 = { message_type: 'group', user_id: String(cfgJ.masterQQ), group_id: 100000000 };
+      const ev2 = { message_type: 'group', user_id: String(cfgJ.masterQQ), group_id: 1000001014 };
       const b = q._atNameConvert('@' + String(cfgJ.masterQQ) + ' 在吗', ev2);
       return !a.includes('@' + String(cfgJ.masterQQ)) && a.includes('@主人')
         && b.includes('@' + String(cfgJ.masterQQ));
@@ -1593,9 +1593,9 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     // 主人 2026-10-23 修：旧代码把号替换成「主人」，群友问「qq号是什么」她答「主人的QQ号就是主人和主人」
     t('群友问 QQ 号：号原样留着，绝不被替换成「主人」（不许再出现「主人和主人」）', (() => {
       const q = require('../src/connectors/qq');
-      const ev = { message_type: 'group', user_id: '100000000', group_id: 100000000 };
-      const b = q._atNameConvert('主人的QQ号是 ' + String(cfgJ.masterQQ) + ' 和 100000000', ev);
-      return b.includes(String(cfgJ.masterQQ)) && b.includes('100000000') && !b.includes('主人和主人');
+      const ev = { message_type: 'group', user_id: '1000001015', group_id: 1000001014 };
+      const b = q._atNameConvert('主人的QQ号是 ' + String(cfgJ.masterQQ) + ' 和 1000001005', ev);
+      return b.includes(String(cfgJ.masterQQ)) && b.includes('1000001005') && !b.includes('主人和主人');
     })());
     t('「在问 QQ 号」的判定：问了才算（QQ音乐这类聊别的、不算问号）', (() => {
       const q = require('../src/connectors/qq');
@@ -1805,10 +1805,10 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     const core2 = require('../src/core');
     const RULE = '你以后发言的结尾还需要加个Ciallo～';
     t('群友说「你以后发言结尾加X」→ 记成跟他一个人的约定（只在对他说话时生效）', (() => {
-      const it = core2.pactAdd('100000000', '企鹅火丁', RULE, '群100000000');
+      const it = core2.pactAdd('1000001015', '企鹅火丁', RULE, '群1000001014');
       const ok = !!core2.pactOf(RULE) && !!it
-        && core2.pactLines('100000000').includes('Ciallo')
-        && !core2.pactLines('100000000').includes('Ciallo');
+        && core2.pactLines('1000001015').includes('Ciallo')
+        && !core2.pactLines('1000001021').includes('Ciallo');
       // 真 bug（2026-10-23）：这条用例会真的往 data/topics.jsonl 写一条——以前每跑一次就多一条重复约定。
       // 断言完立刻把自己写的那条删掉，跑测试不该污染她的记忆。
       if (it && it.id) {
@@ -1877,28 +1877,28 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
 
     // ===== v95（2026-10-23）：必回的回复不 @ 主人 · 别人的约定不许套 =====
     t('「主人的发言必回复」的回复不 @（超时也不 @）；被 @ 叫的照旧按超时 @', (() => {
-      const evG = { message_type: 'group', group_id: 1, user_id: '100000000' };
+      const evG = { message_type: 'group', group_id: 1, user_id: '1000001001' };
       const late = Date.now() - 20000;                      // 20 秒：正常路径铁定 @
       return qq3._applyAtTiming('好的', evG, late, { mustReply: true }) === '好的'
-        && qq3._applyAtTiming('好的', evG, late).indexOf('@100000000') === 0
-        && qq3._applyAtTiming('@100000000 好的', evG, late, { mustReply: true }) === '好的';
+        && qq3._applyAtTiming('好的', evG, late).indexOf('@1000001001') === 0
+        && qq3._applyAtTiming('@1000001001 好的', evG, late, { mustReply: true }) === '好的';
     })());
     t('必回的回复不用 @：模型自己写的 @ 也剥掉，但 @ 别人照留', (() => {
-      const evG = { message_type: 'group', group_id: 1, user_id: '100000000' };
+      const evG = { message_type: 'group', group_id: 1, user_id: '1000001001' };
       const late = Date.now() - 20000;
-      return qq3._applyAtTiming('@100000000 你问他去', evG, late, { mustReply: true }) === '@100000000 你问他去';
+      return qq3._applyAtTiming('@1000001022 你问他去', evG, late, { mustReply: true }) === '@1000001022 你问他去';
     })());
-    // 主人 2026-11-23 报：模型 @ 了主人(100000000)，超时必@ 却又叠 @说话人(Nana)，
+    // 主人 2026-11-23 报：模型 @ 了主人(1000001001)，超时必@ 却又叠 @说话人(Nana)，
     // 再被 atNameConvert 抹掉 @主人 → 变成 @Nana「好的主人」。修：模型写了任意 @号就不再叠加。
     t('模型已写 @号（哪怕 @ 的不是说话人）：超时也不叠加 @当前说话人（2026-11-23 认错人事件）', (() => {
-      const evN = { message_type: 'group', group_id: 1, user_id: '100000000' };  // Nana 说话
+      const evN = { message_type: 'group', group_id: 1, user_id: '1000001013' };  // Nana 说话
       const late = Date.now() - 20000;
-      const out = qq3._applyAtTiming('@100000000 好的主人', evN, late);
-      return out.indexOf('@100000000') < 0 && out.indexOf('@100000000') >= 0;  // 没叠 @Nana，留 @主人
+      const out = qq3._applyAtTiming('@1000001001 好的主人', evN, late);
+      return out.indexOf('@1000001013') < 0 && out.indexOf('@1000001001') >= 0;  // 没叠 @Nana，留 @主人
     })());
     t('没写 @ 的超时回复仍照旧 @ 说话人（确认上面那条没把正常超时@ 改坏）', (() => {
-      const evN = { message_type: 'group', group_id: 1, user_id: '100000000' };
-      return qq3._applyAtTiming('嗯嗯好呀', evN, Date.now() - 20000).indexOf('@100000000') === 0;
+      const evN = { message_type: 'group', group_id: 1, user_id: '1000001013' };
+      return qq3._applyAtTiming('嗯嗯好呀', evN, Date.now() - 20000).indexOf('@1000001013') === 0;
     })());
     t('幻觉删除闸：没删却说「已经删除/撤回」要拦；否定·疑问·教学·转述放过（2026-11-23）', (() => {
       const q = require('../src/connectors/qq');
@@ -1908,12 +1908,12 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     })());
     t('别人的约定不许套（Ciallo 真事）：回别人时自动剥掉，回他本人才留', (() => {
       const SIG = 'QqTest～(∠・ω< )⌒☆';
-      const it = core2.pactAdd('100000000', '测试甲', '你以后发言的结尾还需要加个' + SIG, '群1');
+      const it = core2.pactAdd('1000001023', '测试甲', '你以后发言的结尾还需要加个' + SIG, '群1');
       let ok = false;
       try {
         const body = '对agent？你在说什么呀？' + SIG;
-        ok = core2.stripOtherPacts(body, '100000000') === '对agent？你在说什么呀？'
-          && core2.stripOtherPacts(body, '100000000') === body;
+        ok = core2.stripOtherPacts(body, '1000001001') === '对agent？你在说什么呀？'
+          && core2.stripOtherPacts(body, '1000001023') === body;
       } finally {
         if (it && it.id) {                                  // 测试写完立刻删，不留脏数据
           try {
@@ -1929,7 +1929,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
       return core2.pactSig('你以后发言的结尾还需要加个Ciallo～(∠・ω< )⌒☆') === 'Ciallo～(∠・ω< )⌒☆'
         && core2.pactSig('说话结尾需加Ciallo') === 'Ciallo'
         && core2.pactSig('你以后每条都要加个喵喵') === ''      // 太普通：剥了会把正常说话里的「喵」删掉
-        && core2.pactSig('非神的QQ号是100000000') === '';
+        && core2.pactSig('非神的QQ号是1000001021') === '';
     })());
     t('「真@她」和「引用她的话」分开记：主人引用她 → 回他不用 @；主人真 @ → 照旧超时必 @', (() => {
       const qsrc = fs.readFileSync('connectors/qq.js', 'utf8');
@@ -1953,11 +1953,11 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     // ===== v98（2026-10-23）：群友之间的对话链 =====
     t('「群友之间的对话链」：记住每个人最后一条消息 + 主人此刻在跟谁说话', (() => {
       const q = require('../src/connectors/qq');
-      q._rememberLastMsg(999992, 100000000, 1001, '小肥鱼', '喊三遍了，测我呢');
-      q._noteMasterTalk(999992, 100000000, '那就是死了', '他@了你');
+      q._rememberLastMsg(999992, 1000001024, 1001, '小肥鱼', '喊三遍了，测我呢');
+      q._noteMasterTalk(999992, 1000001022, '那就是死了', '他@了你');
       const mt = q._masterTalkTarget(999992);
       const lm = q._findLastMsgByNick(999992, '小肥鱼');
-      return !!mt && mt.uid === '100000000' && mt.nick === '那就是死了'
+      return !!mt && mt.uid === '1000001022' && mt.nick === '那就是死了'
         && !!lm && lm.id === '1001';
     })());
     t('对话链提示词：明说「这句是对他说的、不是对你说的」，也不许说主人@了你', (() => {
@@ -1967,7 +1967,7 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     })());
     t('主人@别人的提示词：明说「别对着主人答」、别把对方当成你自己', (() => {
       const q = require('../src/connectors/qq');
-      const s = q._masterAimLine({ atQ: '100000000', people: { '100000000': '小肥鱼' }, nickOf: '' });
+      const s = q._masterAimLine({ atQ: '1000001024', people: { '1000001024': '小肥鱼' }, nickOf: '' });
       return s.includes('不是对你说的') && s.includes('别对着主人答') && s.includes('别把「小肥鱼」当成你自己');
     })());
     t('发送层兜底：没被@也没被引用 → 不许说「你@我/你艾特我/你引用我」', (() => {
@@ -2086,8 +2086,8 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     // ===== v101（2026-10-23）：接入 SealDice 官方引擎，骰子语法补全 =====
     t('接了 SealDice 官方引擎（npm: dicescript），群里的 .rb100 / .ww100 现在能掷', (() => {
       const d = require('../src/dice.js');
-      const rb = d.handle('.rb100', '100000000');
-      const ww = d.handle('.ww100', '100000000');
+      const rb = d.handle('.rb100', '1000001001');
+      const ww = d.handle('.ww100', '1000001001');
       return !!rb && rb.includes('奖励骰') && rb.includes('100 颗')
         && !!ww && ww.includes('成功');
     })());
@@ -2109,10 +2109,10 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
     })());
     t('老功能没被破坏：.r 简单表达式仍走本项目自己的格式，.rc/.sc/.st 一字未改', (() => {
       const d = require('../src/dice.js');
-      const r = d.handle('.r 3d6+2', '100000000');
+      const r = d.handle('.r 3d6+2', '1000001001');
       if (!r || !/^🎲 3d6\+2 = \[/.test(r)) return false;   // 老格式：3d6+2 = [3,4,6] + 2 = 15
-      const rc = d.handle('.rc 侦查 60', '100000000');
-      const st = d.handle('.st san 60', '100000000');
+      const rc = d.handle('.rc 侦查 60', '1000001001');
+      const st = d.handle('.st san 60', '1000001001');
       return !!rc && rc.includes('侦查 d100 =') && rc.includes('/ 60 →')
         && !!st && st.includes('理智值已设为 60');
     })());
@@ -2209,16 +2209,16 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
         && pcc.includes('var tabChains = TABS.map') && !pcc.includes('if (tb.path[dstPath.length] === si) tb.path[dstPath.length] = to;');
     })());
 
-    // ===== v92（2026-10-23）：她说「已成功加入群100000000」，实际没进群 =====
+    // ===== v92（2026-10-23）：她说「已成功加入群1000001003」，实际没进群 =====
     {
       const qq = require('../src/connectors/qq');
-      const LIE = '已成功加入群100000000，主人～';
+      const LIE = '已成功加入群1000001003，主人～';
       t('谎报闸：主人让加群，她说「已成功加入群…」→ 拦下换成实话（真事 2026-10-23）', (() => {
         const out = qq._noFakeJoin(LIE);
         return out !== LIE && !/已成功加入|已经进群|加好了/.test(out) && /做不了|邀请|拉进/.test(out);
       })());
       t('谎报闸：「我这就去加群 / 我进群了 / 加好了」这类完成或将来宣言也拦', (() => {
-        return ['我这就去加群100000000！', '我进群了，里面好热闹', '加好了，群号100000000', '好呀，已经进群了']
+        return ['我这就去加群1000001003！', '我进群了，里面好热闹', '加好了，群号1000001003', '好呀，已经进群了']
           .every(s => qq._noFakeJoin(s) !== s);
       })());
       t('谎报闸：不误伤——「我在群里」是真的、邀请/做不到的说法、别人的事都不改', (() => {
@@ -2303,15 +2303,15 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
       vid.wantsFull('看看这个视频') === true && vid.wantsFull('查看') === true && vid.wantsFull('午休吧') === false);
     // 2026-11-22：笑点解析词表 + 只解析目标 + 兜底只一句喵
     const cdx = require('../src/core');
-    const xdV = { scope: 'quote', target: '（他引用的消息）乙：司凤是什么意思' };
-    const goodAns = ['【聊天记录】', '乙：司凤是什么意思', '【解析】', '资料：司凤谐音死冯。',
-      '对话中「乙」说「司凤是什么意思」意思是自己的老妈死了，此为1层笑点。',
+    const xdV = { scope: 'quote', target: '（他引用的消息）大肥鱼：司凤是什么意思' };
+    const goodAns = ['【聊天记录】', '大肥鱼：司凤是什么意思', '【解析】', '资料：司凤谐音死冯。',
+      '对话中「大肥鱼」说「司凤是什么意思」意思是自己的老妈死了，此为1层笑点。',
       '而蠢蠢的ai，回复「你是在说我吗」。没有理解这句话的双关，令人忍俊不禁喵。'].join('\n');
     t('笑点解析：合格答案要过（记录+资料行+此为1层笑点+术语+喵）', cdx._xdCheck(goodAns, xdV).ok === true, cdx._xdCheck(goodAns, xdV).why);
     t('笑点解析：缺「资料：」行判不合格',
       cdx._xdCheck(goodAns.replace('资料：司凤谐音死冯。', ''), xdV).ok === false,
       cdx._xdCheck(goodAns.replace('资料：司凤谐音死冯。', ''), xdV).why);
-    const strayAns = ['【聊天记录】', '乙：司凤是什么意思', '小海豹：就是死冯啊', '【解析】', '资料：（没查到明确资料）',
+    const strayAns = ['【聊天记录】', '大肥鱼：司凤是什么意思', '小海豹：就是死冯啊', '【解析】', '资料：（没查到明确资料）',
       '对话中「小海豹」说「就是死冯啊」是谐音梗，此为1层笑点。', '令人忍俊不禁喵'].join('\n');
     t('笑点解析：有引用时解析到了对话其它条 → 不合格',
       cdx._xdCheck(strayAns, xdV).ok === false && /没被选中/.test(cdx._xdCheck(strayAns, xdV).why),
@@ -2326,16 +2326,16 @@ const t = (name, ok, extra) => { ok ? pass++ : fail++; console.log((ok ? '✓ ' 
         return st.sid === 'S10' && st.terms.some(x => x.name === '荒诞因果') && st.lines.length > 0; })());
     // 2026-11-24：格式全过但没解析出笑点 → 不合格（占位符/空话/无实质/没引原话）
     t('聊天记录照抄「代称」占位符 → 不合格',
-      (() => { const r = core._xdCheck(goodAns.replace('乙：司凤是什么意思', '代称：司凤是什么意思'), xdV);
+      (() => { const r = core._xdCheck(goodAns.replace('大肥鱼：司凤是什么意思', '代称：司凤是什么意思'), xdV);
         return r.ok === false && /占位符|代称/.test(r.why); })());
     t('空话「正是笑点所在」→ 不合格',
       (() => { const r = core._xdCheck(goodAns.replace('意思是自己的老妈死了，', '意思是自己的老妈死了，正是笑点所在，'), xdV);
         return r.ok === false && /空话/.test(r.why); })());
     t('某层没有实质内容 → 不合格',
-      (() => { const r = core._xdCheck(goodAns.replace('对话中「乙」说「司凤是什么意思」意思是自己的老妈死了，', '笑死，'), xdV);
+      (() => { const r = core._xdCheck(goodAns.replace('对话中「大肥鱼」说「司凤是什么意思」意思是自己的老妈死了，', '笑死，'), xdV);
         return r.ok === false && /没有实质/.test(r.why); })());
     t('解析没引用目标原话 → 不合格',
-      (() => { const bad = ['【聊天记录】', '乙：司凤是什么意思', '【解析】', '资料：（没查到明确资料）',
+      (() => { const bad = ['【聊天记录】', '大肥鱼：司凤是什么意思', '【解析】', '资料：（没查到明确资料）',
           '他这个问题问得真好，大家听完都乐了，此为1层笑点。', '这句话有双关，令人忍俊不禁喵'].join('\n');
         const r = core._xdCheck(bad, xdV); return r.ok === false && /原话/.test(r.why); })());
     t('提示词契约：昵称规则 + 四问，不再有「代称：原话」',

@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 chcp 65001 >nul
 title Utsuro Bot
-set "NODE=C:/Users/user/.workbuddy/binaries/node/versions/22.22.2-6/node.exe"
+set "NODE=C:~/.workbuddy/binaries/node/versions/22.22.2-6/node.exe"
 if not exist "%NODE%" set "NODE=node"
 echo ==========================================
 echo   Utsuro Bot  -  QQ / Bilibili

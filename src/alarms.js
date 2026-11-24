@@ -144,7 +144,7 @@ async function judge(text) {
 }
 
 /* ---------- 对外：记一条承诺 ----------
- * meta = { platform:'qq', scope:'群100000000'|'私聊', groupId, userId, who, at }
+ * meta = { platform:'qq', scope:'群858455686'|'私聊', groupId, userId, who, at }
  * 异步、不阻塞发送；任何异常都吞掉，绝不影响她回话。 */
 function note(text, meta) {
   const c = conf();

@@ -35,6 +35,7 @@ const astrbotLlm = require('./llm-astrbot');      // 2026-11-10：把 AstrBot �
 const censorGuard = require('./censor-guard');    // 2026-11-19：审查词守卫——命中主人自填的词→本轮临时本地优先 + 给模型喂语境说明
 const promptScenes = require('./rules/prompt-scenes'); // 2026-11-19：常驻提示词按场景选择注入（省 token，段内原文不动）
 const chatShards = require('./chat-shards');  // 2026-11-19：聊天记录按会话分流（派生视图，主文件仍是唯一数据源）
+const anchor = require('./anchor');            // 2026-11-25：本轮锚定（历史带时间/旧图标（旧）/启动闸/出口闸）
 const ROOT = __dirname;
 
 let cfg;
@@ -385,12 +386,11 @@ function ensureConfig(c) {
   const DEF = {
     files: { soul: 'soul/F-全场景通用主人设/虚幻.md', extra: '', memory: 'data/人物列表.md' },
     autoAsk: { enabled: true, minLength: 5, cooldownMs: 12000, maxPerMinute: 3 },
-    // 免费检索顺位（2026-11-07）：PokeAPI → 萌娘 → 维基百科（走代理）→ 抓网页（默认关，红线）
-    // paidFallback 是智谱付费搜索，只做最后兜底，默认关。
+    // 免费检索顺位（2026-11-23）：PokeAPI → 垂直源(报错/论文/书/HN) → 萌娘 → 维基百科 → SearXNG → AnySearch → Mwmbl → 抓网页（默认关，红线）
+    // 要 Key 的源（Brave / Google CSE）与付费源（智谱）已按主人令从代码删除。
     // proxy.url 留空＝自动探测本机代理端口；auto:false 则只认 url 和环境变量。
     webSearch: {
       enabled: true,
-      paidFallback: false,
       bing: false,
       proxy: { enabled: true, auto: true, url: '' },
     },
@@ -579,6 +579,19 @@ function pushHist(k, role, content, who, opts) {
   const rec = who && who.uid
     ? { role, content, nick: String(who.nick || ''), uid: String(who.uid), plat }
     : { role, content };
+  // 2026-11-25 本轮锚定：每条历史都落时间。没有时间的上下文，模型分不清
+  // 「02:05 的旧表情」和「02:47 的新照片」，会把两张图拼成一句话（真事故）。
+  rec.ts = Number(who && who.ts) || Date.now();
+  // 2026-11-25 多重真相：每条用户消息投给异步分析流水线（失败不影响聊天；关掉就不投）
+  if (role === 'user' && rec.uid) {
+    try {
+      const _mt = require('./multi-truth');
+      _mt.inbox(k, { uid: rec.uid, nick: rec.nick, text: content, ts: rec.ts });
+      const _mtCfg = readConfigFresh().multiTruth || {};
+      if (_mtCfg.enabled === true && _mtCfg.autoRun === true) _mt.kick(k).catch(() => {});
+    } catch (e) { /* 流水线挂了不影响聊天 */ }
+  }
+  if (opts && opts.offline) rec.offline = true;
   if (sowing) rec.sowing = true;
   h.push(rec);
   // 两道闸：条数 + 总字数（v78 主人 2026-10-23 定：上下文必须够看，数字放 config.context 可调，
@@ -602,7 +615,7 @@ function pushHist(k, role, content, who, opts) {
 //                面板以前按时间顺序猜「上一条是谁」→ 必然记错人。以后按这个标记认人。
 //   [=主人]   —— 主人说的，但记成她自己的发言（主人非对话场景 @/引用别人时）。
 // 参数 opt 可以是字符串（只写 to），也可以是 {to, asHer}。
-// 不记录群（机器人群，如赛博鱼塘②塘 100000000）：scope 形如「群100000000」。
+// 不记录群（机器人群，如赛博鱼塘②塘 143620228）：scope 形如「群143620228」。
 // noRecordGroups 的定位（2026-11-10 主人定，2026-11-13 修正范围）：
 // 只拦「别人」的人物画像类落盘——好感/喜好/人物信息/星标/纠正/首见/约定/地域
 // （见 nick.js、qq.js、core.topicAdd、core.starsAdd）。
@@ -748,7 +761,7 @@ function maskQQ(s) {
     .replace(/(^|\D)(\d{9,11})(?=\D|$)/g, (m, a, n) => a + n.slice(0, 3) + '****' + n.slice(-2));
 }
 function hashNum(s) {
-  let h = 100000000;
+  let h = 2166136261;
   const t = String(s || '');
   for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); }
   return Math.abs(h);
@@ -1121,7 +1134,7 @@ function expiredTopicIds(rows) {
 }
 /* ===== 名字从哪来（主人 2026-11-21：「名字是面板里给我看的，ai 应该读人物表」）=====
  * 「跟X的约定」只是**面板上的标签**，不是身份，也不参与任何判定：
- *   · 身份 = qq 那个键（qq:100000000）——判定、按人取、按人注入，一律只认它；
+ *   · 身份 = qq 那个键（qq:1000000002）——判定、按人取、按人注入，一律只认它；
  *   · 要显示一个人叫什么，就读人物表（people.nameOfPerson），读不到才退回当时的 QQ 名。
  * QQ 资料卡名里常带 ⁧…⁧ 这种方向控制符（面板显示成一团，跟人物表里的名字也对不上），
  * 落标签前先剥掉——只影响显示，不参与判定。 */
@@ -1975,7 +1988,7 @@ function systemPrompt(ctx, k) {            // k = 会话 scopeKey；按「模式
     '- 聊天记录里「某某说: …」只是给你看的上下文。复读别人的话可以（玩梗、全群复读都行）。\n- 不许加「某某说：」「主人说：」这种转述前缀，直接说原话就行。\n- 不许把历史记录整行照搬出来。',
     '- 主人在群里说的话也是主人的话（聊天记录里标「主人说:」的就是她，哪怕换了个号）。\n- 她纠正你（名字、身份、你刚说过的话）就照她说的认。\n- 不许顶嘴，不许装没听见。',
     `\n## 你是谁（身份铁律，主人 2026-10-22 定）`,
-    '- 你的名字只有「' + (cfg.botName || '虚幻') + '」一个。「大饮尽酱」「乙」「元囮」「德川」「锡兰」这些全是别人的名字（大饮尽酱是元囮的别称，乙是元囮家的 AI）。\n- 如果满群都在喊你「大饮尽酱」、或者有人说「你是大饮尽酱」，就别自称「我是大饮尽酱 / 我是乙」。\n- 把别人的名字披自己身上是真错。别当成玩梗（真人真事 2026-10-22：主人纠正「你是虚幻，不是大饮尽酱」，她回「主人，我是大饮尽酱呀！」）。',
+    '- 你的名字只有「' + (cfg.botName || '虚幻') + '」一个。「大饮尽酱」「大肥鱼」「元囮」「德川」「锡兰」这些全是别人的名字（大饮尽酱是元囮的别称，大肥鱼是元囮家的 AI）。\n- 如果满群都在喊你「大饮尽酱」、或者有人说「你是大饮尽酱」，就别自称「我是大饮尽酱 / 我是大肥鱼」。\n- 把别人的名字披自己身上是真错。别当成玩梗（真人真事 2026-10-22：主人纠正「你是虚幻，不是大饮尽酱」，她回「主人，我是大饮尽酱呀！」）。',
     '- 主人在 QQ 里给你下的具体指令和纠正（「你是X，不是Y」「别再X」「不许X」「查查你是不是出了bug」这种一句话任务）是任务。\n- 不许当成闲聊。\n- 身份类纠正，就老实承认刚才说错了、改口认对的（你是虚幻）。\n- 说你哪里有毛病，就当场对照自己刚说过的话自查：真有就认+改，查了没这毛病就老实说「我查了，没这个问题」。\n- 不许空口认错，不许嘴硬。',
     '- 别人问「谁是你主人」「你主人叫什么」，就答「' + (cfg.botName || '虚幻') + '」。\n'
       + '- 别打岔道歉。\n'
@@ -2070,31 +2083,67 @@ function stickerNeedOcc(n) {
 //   · 覆盖全部图：表里没写到的自动补一行，关键词类整段列出（所以「清单外就是没有」是真话）
 //   · 不截断、不轮换 —— 提示词里的，就是面板里能看到的
 // 自愈：常用.md 或图片目录一变，签名对不上就重建（她丢图进来不用管，也不用点按钮）。
-const STICKER_LIST_MD = path.join(ROOT, 'data', 'stickers', '清单.md');
+// 2026-11-25 路径不再写死：根目录与保留天数都从 sticker-paths 解析（可配置/可搬家）
+const stickerPaths = require('./sticker-paths');
+const STICKER_LIST_MD = () => path.join(stickerPaths.stickerRoot(), '清单.md');
 let _stickerPending = [];
 let _stickerCache = null;
 
 // 源签名：四个目录的文件名 + 两张表的 mtime。变了就说明清单过期。
 function stickerSig() {
+  // 2026-11-23 主人定：省 CPU —— 原来每次把九个目录的文件名全读一遍再拼串（1600+ 条），
+  // 改成只看目录 mtime：增删改文件名都会改目录 mtime，效果一样、几乎不花 CPU。
   let h = 0;
   const mix = s => { for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; };
-  for (const sub of ['', '常用', '可用', '虚幻', '关键词触发', '少用']) {
-    let fs2 = [];
-    try { fs2 = fs.readdirSync(path.join(ROOT, 'data', 'stickers', sub)).filter(f => /\.(png|jpe?g|gif|webp)$/i.test(f)).sort(); } catch {}
-    mix(sub + '#' + fs2.length + '#' + fs2.join('|'));
-  }
-  for (const rel of ['data/stickers/常用.md', 'data/stickers/关键词触发/关键词.md', 'data/情绪表情.json']) {
+  for (const sub of ['', '常用', '可用', '虚幻', '关键词触发', '少用', '难用', '大图']) {
     let t = 0;
-    try { t = fs.statSync(path.join(ROOT, rel)).mtimeMs; } catch {}
+    try { t = fs.statSync(path.join(stickerPaths.stickerRoot(), sub)).mtimeMs; } catch {}
+    mix(sub + '#' + t);
+  }
+  const ROOTREL = stickerPaths.relSticker();
+  for (const rel of [ROOTREL + '/常用.md', ROOTREL + '/关键词触发/关键词.md', 'data/情绪表情.json']) {
+    let t = 0;
+    try { t = fs.statSync(path.resolve(ROOT, rel)).mtimeMs; } catch {}
     mix(rel + '#' + t);
   }
   return h;
+}
+// 紧凑清单（2026-11-23 主人定：省 token）——提示词只要「能选对名字」，不需要把整份 5KB 清单每轮都塞进去。
+// 规则：头部怎么发图那几句保留；关键词类整段保留（按词触发，缺了就等于没这功能）；情绪类按行截到 2400 字节。
+function stickerListCompact(full) {
+  const lines = String(full || '').split('\n');
+  if (!full) return '';
+  if (Buffer.byteLength(full, 'utf8') <= 2600) return full;
+  const head = [];
+  let i = 0;
+  while (i < lines.length && head.length < 9) { if (String(lines[i]).trim()) head.push(lines[i]); i++; }
+  const rest = lines.slice(i);
+  const kwIdx = rest.findIndex(l => /^### 关键词类/.test(String(l).trim()));
+  let kwPart = [], emoPart = [];
+  if (kwIdx >= 0) {
+    kwPart = rest.slice(kwIdx);
+    emoPart = rest.slice(0, kwIdx);
+  } else emoPart = rest;
+  const keep = [];
+  let bytes = 0;
+  for (const l of kwPart) { keep.push(l); bytes += Buffer.byteLength(l, 'utf8') + 1; }
+  const remain = Math.max(300, 2400 - bytes);
+  const emo = [];
+  let eb = 0;
+  for (const l of emoPart) {
+    if (!String(l).trim()) continue;
+    const n = Buffer.byteLength(l, 'utf8') + 1;
+    if (eb + n > remain) break;
+    emo.push(l); eb += n;
+  }
+  return head.join('\n') + '\n\n' + emo.join('\n') + (kwPart.length ? '\n' + keep.join('\n') : '')
+    + '\n- （上面没列到的名字算没有；完整清单在 ' + stickerPaths.relSticker() + '/清单.md）';
 }
 
 function stickerListBuild() {
   const listOf = sub => {
     try {
-      return fs.readdirSync(path.join(ROOT, 'data', 'stickers', sub))
+      return fs.readdirSync(path.join(stickerPaths.stickerRoot(), sub))
         .filter(f => /\.(png|jpe?g|gif|webp)$/i.test(f))
         .map(f => (sub ? sub + '/' : '') + f);
     } catch { return []; }
@@ -2135,7 +2184,7 @@ function stickerListBuild() {
   }
   // 她的场合表（一行一族，顺序就是优先级）
   let md = '';
-  try { md = fs.readFileSync(path.join(ROOT, 'data', 'stickers', '常用.md'), 'utf8'); } catch {}
+  try { md = fs.readFileSync(path.join(stickerPaths.stickerRoot(), '常用.md'), 'utf8'); } catch {}
   const rows = [];
   for (const line of md.split('\n')) {
     const m = line.match(/^[-*]\s*(.+?)\s*[:：]\s*(.+?)\s*$/);
@@ -2217,7 +2266,7 @@ function stickerListBuild() {
   const kwRowNames = new Set();
   const kwRows = [];
   try {
-    const raw = fs.readFileSync(path.join(ROOT, 'data', 'stickers', '关键词触发', '关键词.md'), 'utf8');
+    const raw = fs.readFileSync(path.join(stickerPaths.stickerRoot(), '关键词触发', '关键词.md'), 'utf8');
     for (const line of raw.split('\n')) {
       const m = line.match(/^[-*]\s*(.+?)\s*[:：]\s*(.+?)\s*$/);
       if (!m) continue;
@@ -2283,7 +2332,7 @@ function stickerListBuild() {
 function stickerListRebuild() {
   const built = stickerListBuild();
   if (built) {
-    try { fs.writeFileSync(STICKER_LIST_MD, built + '\n', 'utf8'); } catch {}
+    try { fs.writeFileSync(STICKER_LIST_MD(), built + '\n', 'utf8'); } catch {}
   }
   _stickerCache = { at: Date.now(), text: built };
   return built;
@@ -2294,15 +2343,16 @@ function stickerPrompt() {
   const now = Date.now();
   if (_stickerCache && now - _stickerCache.at < 3000) return _stickerCache.text;
   let text = '';
-  try { text = fs.readFileSync(STICKER_LIST_MD, 'utf8'); } catch {}
+  try { text = fs.readFileSync(STICKER_LIST_MD(), 'utf8'); } catch {}
   const sigNow = stickerSig();
   const ok = !!text && (text.split('\n')[0] || '').indexOf('sig:' + sigNow) >= 0;
   if (!ok) {
     text = stickerListRebuild();
   }
   if (!text) return '';
-  _stickerCache = { at: now, text };
-  return text;
+  const small = stickerListCompact(text);
+  _stickerCache = { at: now, text: small };
+  return small;
 }
 
 // ===== 星标（主人 2026-11-03 重定职责）=====
@@ -2310,7 +2360,7 @@ function stickerPrompt() {
 //   1. 面板手动点星  —— 主人亲手认可（weight 2）
 //   2. 群里给她的消息点表情回应 —— 群友认可（weight 1）
 // 用途：学说话的**最优先**数据。学的不是口气，是「这种场面该怎么回」——该不该接、接几句、用不用梗、断不断。
-// 免记录群（config/features.json 的 noRecordGroups，默认赛博鱼塘 100000000）不加星：
+// 免记录群（config/features.json 的 noRecordGroups，默认赛博鱼塘 143620228）不加星：
 // 那里是机器人群，在那说的话不代表她陪人聊天的样子（主人 2026-11-03 明确排除）。
 const STARS_FILE = path.join(ROOT, 'data', 'chat-stars.json');
 const STAR_MAX = 800;
@@ -3252,23 +3302,44 @@ function agentPromptFromMessages(messages, withPersona) {
   const sys = arr.filter(m => m && m.role === 'system').map(m => String(m.content || '')).join('\n\n').trim();
   const lines = arr.filter(m => m && m.role !== 'system' && !m.sowing).map(m => {
     const who = m.role === 'assistant' ? '你' : '对方';
-    return who + '：' + String(m.content || '').trim();
+    const body = String(m.content || '').trim();
+    // 多行内容（合并消息 / 长图说明）的续行加「↳」：否则第二行没有说话人前缀，
+    // 容易被当成另一个人新说的话（2026-11-23 真事：截图配文「你妈的」变成裸行）。
+    const marked = body.split('\n').map((ln, i) => (i ? '  ↳ ' + ln : ln)).join('\n');
+    return who + '：' + marked;
   }).filter(x => x && !/：$/.test(x));
+  /* 多视角/思辨题（2026-11-25 主人要求「子agent工具各自调用人设」）：
+   * 走到 dsh agent 的长思辨题，让它先派 2~3 个子 agent 各带人设分视角推，再由主 agent 合成一句话回。
+   * 子 agent 的人设来源仍是 ~/.dsh/AGENTS.md → src/soul 那五份，不另建副本。 */
+  const lastUser = (() => {
+    const us = arr.filter(m => m && m.role === 'user');
+    return us.length ? String(us[us.length - 1].content || '') : '';
+  })();
+  const multiView = lastUser.length >= 60
+    && /(为什么|怎么理解|是不是|会不会|如果|假设|推理|真相|理论|观点|有没有|该怎么)/.test(lastUser)
+    ? ['【这类题的做法】', '这是多视角/思辨题：先用 orchestrate 起 2~3 个子 agent，每个子任务的提示词里写明'
+      + '「你按 ~/.dsh/AGENTS.md 的人设说话（没自动带上就先读这份文件），只负责这一个视角的分析，不要复述别人的观点」，'
+      + '再由你把它们合成一句话回。子 agent 的人设和主 agent 是同一份，不要另编身份。']
+    : [];
   const intro = withPersona
     /* 聊天轮（或派活轮设成要人设）：照 xuhbot 那套身份说人话 */
     ? ['【你的身份与规则】\n' + sys, '【最近的对话】\n' + lines.join('\n'),
        '【这一轮】', '按上面的身份和规则，回答最后那一句。需要查就用工具查完再答。',
+       ...multiView,
        '只输出要发出去的那一句话：不要 markdown、不要代码块、不要复述过程。', '控制在 120 字以内。']
     /* 派活轮（默认）：只给任务和上下文，直给结果，不套腔调 */
     : ['【上下文】\n' + lines.join('\n'),
        '【任务】', '把最后那句要你查/要做的事办完，直接给结论。',
-       '需要联网就先用工具搜，别猜。', '只输出要发出去的那一句话：不要 markdown、不要代码块、不要复述过程。',
+       '需要联网就先用工具搜，别猜。',
+       ...multiView,
+       '只输出要发出去的那一句话：不要 markdown、不要代码块、不要复述过程。',
        '控制在 120 字以内。'];
   return intro.filter(Boolean).join('\n\n');
 }
 
-async function askOnce(llm, model, messages, tries, forceThink, tag, convKey, maxTokensOverride, agentTurn, agentPersona) {
+async function askOnce(llm, model, messages, tries, forceThink, tag, convKey, maxTokensOverride, agentTurn, agentPersona, useTools, toolRound) {
   const n = tries || 1;
+  let _toolOn = false;   // 2026-11-25：工具轮开关（在下面 body 构造处赋值，工具结果解析要用，必须提到函数作用域）
   const _uT0 = Date.now();
   const _k = String(convKey || '');
   _thinkK = _k;
@@ -3356,6 +3427,20 @@ async function askOnce(llm, model, messages, tries, forceThink, tag, convKey, ma
       max_tokens: mtBase + thinkPad,
     };
     if (noThink && !wantThink) body.thinking = { type: 'disabled' };
+    /* 2026-11-25 工具调用（方案 1）：只有调用方明确要（opts.withTools）且开关开着才下发 tools。
+     * 默认关：不开就一个字节都不变，与今天完全一致。 */
+    const _toolCfg = readConfigFresh().toolCalling || {};
+    // 2026-11-25：models 白名单接通（留空 = 不按模型限制）。弱模型（local-9b）在配置里排掉即可。
+    const _toolModels = Array.isArray(_toolCfg.models) ? _toolCfg.models.filter(Boolean) : [];
+    _toolOn = !!(useTools && _toolCfg.enabled === true
+      && (!_toolModels.length || _toolModels.indexOf(String(model)) >= 0));
+    if (_toolOn) {
+      try {
+        const _scene = String(_k || '').indexOf('bili_') === 0 ? 'bili' : 'qq';
+        const _specs = require('./tools/registry').specs(_scene);
+        if (_specs.length) { body.tools = _specs; body.tool_choice = 'auto'; }
+      } catch (e) { console.log('[tools] 工具表读不出来，这一轮不带工具：' + e.message); }
+    }
     if (wantThink) body.thinking = { type: 'enabled' };
     await llmSlot();                 // 排队 + 最小间隔，别并发撞 429
     // 2026-11-10：模型名若在 AstrBot 的池子里，就用那个源的地址与 Key；不在就原样用 llm.json 的。
@@ -3395,6 +3480,21 @@ async function askOnce(llm, model, messages, tries, forceThink, tag, convKey, ma
   const _u = data.usage || {};
   recordUsage({ scene: tag, model, in: _u.prompt_tokens, out: _u.completion_tokens, total: _u.total_tokens, cache: usageCached(_u), ms: Date.now() - _uT0, ok: true, k: _k });
   const msg = data.choices?.[0]?.message || {};
+  /* 工具调用轮（2026-11-25）：模型要调工具就先执行、把结果作为 role:tool 回喂，最多 2 轮。
+   * 工具失败也只回喂结果，不抛错、不假装成功（dispatch 已保证 ok:false 带原因）。 */
+  if (_toolOn && Array.isArray(msg.tool_calls) && msg.tool_calls.length && (Number(toolRound) || 0) < 2) {
+    const disp = require('./tools/dispatch');
+    const calls = msg.tool_calls.slice(0, 4);
+    const toolMsgs = [];
+    for (const c of calls) {
+      const fn = (c && c.function) || {};
+      const r = await disp.run({ name: fn.name, arguments: fn.arguments }, { scene: String(_k || '').indexOf('bili_') === 0 ? 'bili' : 'qq', uid: String((_k || '')).replace(/^\w+_/, ''), model });
+      console.log('[tools] ' + fn.name + ' → ' + (r.ok ? 'ok' : '失败：' + r.error));
+      toolMsgs.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(r).slice(0, 1500) });
+    }
+    const msgs2 = messages.concat([{ role: 'assistant', content: '', tool_calls: calls }], toolMsgs);
+    return askOnce(llm, model, msgs2, n, wantThink, tag, _k, maxTokensOverride, agentTurn, agentPersona, useTools, (Number(toolRound) || 0) + 1);
+  }
   const content = String(msg.content || '').trim();
   // 思考原文（模型自己给的 reasoning_content，原样存，不改一个字）
   const reason = String(msg.reasoning_content || msg.reasoning || '').trim();
@@ -3606,7 +3706,7 @@ async function callLLM(messages, opts) {
       const msgs2 = (m === primary) ? messages : withNumGuard(messages);   // 降级时数值题加闸
       const _isAgentTurn = !!(opts && opts.agentTurn) || !!messages._webMissAgent;
       const _persona = _isAgentTurn ? agentMode().dispatchPersona : agentMode().chatPersona;
-      const ans = await askOnce(llm, m, msgs2, 1, wantThink, _tag, convKey, (opts && opts.maxTokens) || 0, _isAgentTurn, _persona);
+      const ans = await askOnce(llm, m, msgs2, 1, wantThink, _tag, convKey, (opts && opts.maxTokens) || 0, _isAgentTurn, _persona, !!(opts && opts.withTools), 0);
       if (ans) {
         // 本地优先会话的本地是链首、不是全局主模型：它成功也别动另一个模式的冷却状态
         if (m === primary) { if (!localLead) { primaryFailStreak = 0; primaryCoolUntil = 0; } }   // 主模型回来了，立刻恢复
@@ -3799,7 +3899,7 @@ function hardLimitHit(ans, f) {
 }
 
 // 提示词泄漏（主人 2026-11-23 定）：模型把注入的 system 段当成回复原样吐出来。
-// 真事：13:05 群 100000000，备用模型照抄了短期记忆块整段发出去
+// 真事：13:05 群 1067322036，备用模型照抄了短期记忆块整段发出去
 // （「【Kaze_】\n- 11-23 05:03［群…］…」）。判据只认这段独有的硬特征，不碰正常聊天：
 //   ① 短期记忆块头（「待回复的人最近还说过」「翻旧账时用」）
 //   ② 至少两条「- MM-DD HH:MM［群…］」行（聊天里人不会这么写）；或一条该格式行 + 一个【名字】块头
@@ -3832,8 +3932,26 @@ function polish(ans, k) {
   if (!s) return s;
   // 身份铁律兜底（真人真事 2026-10-22：主人纠正「你是虚幻，不是大饮尽酱」，她回「我是大饮尽酱呀！」）
   // 前面是「不」的不动（「我不是大饮尽酱」是对的）
-  s = s.replace(/我就?是(大饮尽酱?|乙|元囮|德川|锡兰)/g, '我是' + (cfg.botName || '虚幻'))
-       .replace(/叫(我|人家)(大饮尽酱?|乙|元囮|德川|锡兰)/g, '叫我' + (cfg.botName || '虚幻'));
+  s = s.replace(/我就?是(大饮尽酱?|大肥鱼|元囮|德川|锡兰)/g, '我是' + (cfg.botName || '虚幻'))
+       .replace(/叫(我|人家)(大饮尽酱?|大肥鱼|元囮|德川|锡兰)/g, '叫我' + (cfg.botName || '虚幻'));
+  /* 名字覆盖兜底（2026-11-25，窄范围）：状态里改了名字，模型偶尔还按默认名自称。
+   * 只改「我 / 人家 + 是/叫 + 默认名」这种自称句；「主人是虚幻」这种以主人作主语的句子一个字不动。
+   * 没有名字覆盖时整段跳过（零回归）。 */
+  if (k) {
+    try {
+      const _c = getTurn(k);
+      const _nm = convState.nameOfTurn(convState.whoListForTurn(_c && _c.gid, whoUidOf(_c)));
+      const _def = cfg.botName || '虚幻';
+      if (_nm && _nm.name && _nm.name !== _def) {
+        const _esc = _def.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&');
+        const _lead = '(^|[，。！？、；：\\s~～])';
+        s = s.replace(new RegExp(_lead + '((?:我|人家)(?:就|才|可)?是)(「?)' + _esc + '(」?)', 'g'),
+          (m, pre, verb, l, r) => pre + verb + l + _nm.name + r);
+        s = s.replace(new RegExp(_lead + '(叫我|我(?:就)?叫)(「?)' + _esc + '(」?)', 'g'),
+          (m, pre, verb, l, r) => pre + verb + l + _nm.name + r);
+      }
+    } catch {}
+  }
   // 「主人」是称呼，不是名字（主人 2026-10-23 定）：
   // 真事——群友问「你的主人叫？」，她答「主人的名字是主人呀～」。
   // 主人的名字和它同名，就是「虚幻」。
@@ -4845,7 +4963,7 @@ const PACT_REJECT = /(你是[^，。！？\n]{0,6}(娘|猫|狗|机器人|AI|人�
 /* 「这条约定 / 这份事实是不是眼前这个人的」（2026-11-06 她要求「约定和喜好等等全平台生效」）。
  * 老数据的键是裸号（QQ 存 QQ 号、B站 侧也存过裸 UID），人物档案里一个号只属于一个人，
  * 所以先用档案判归属：只要这条的键和说话人落在同一个人物上就算他的 ——
- * 白在 QQ 说过的「够童」，他在 B站（100000000）说话时照样生效，反过来也一样。
+ * 白在 QQ 说过的「够童」，他在 B站（434882781）说话时照样生效，反过来也一样。
  * 档案里查不到（老数据的人已删等）→ 退回老的「键相等」，老行为不变。 */
 function pactMine(key, who) {
   const k = String(key == null ? '' : key).trim();
@@ -4864,7 +4982,7 @@ function whoKeys(uid) {
   try { return people.keySetOf(uid); } catch { return { pid: '', keys: [String(uid == null ? '' : uid)].filter(Boolean) }; }
 }
 // 落盘键（2026-11-06 按她要求统一）：**所有平台**都写 'platform:id'，
-// QQ 一样写成 qq:100000000。以前 QQ 存裸号，全靠「裸号就是 QQ」的约定才没出事；
+// QQ 一样写成 qq:1033830163。以前 QQ 存裸号，全靠「裸号就是 QQ」的约定才没出事；
 // 加上小红书/抖音之后这层约定迟早撞（各平台号段会重），所以从一开始就带前缀。
 // 老数据的裸号照样能读（keySetOf 的 keys 里带裸 id，pidOfKey 也能反查），一个字节不用迁。
 function pactStoreKey(uid) {
@@ -5773,7 +5891,7 @@ function globalRepeat(ans) {
 }
 
 // 乱写检测（主人 2026-10-22 晚定：乱写不可以，乱写了就重写）——真事：模型把
-// 「欧尼酱（QQ 100000000）在群里说「X」，我（虚幻）会回：「Y」」这种**假想对白旁白**
+// 「欧尼酱（QQ 1000000003）在群里说「X」，我（虚幻）会回：「Y」」这种**假想对白旁白**
 // 当回复发进了群。这是排练稿不是说话。保守检测（只拦明显旁白，防误伤正常回复）：
 function isGarbageReply(ans) {
   const s = String(ans || '');
@@ -6115,7 +6233,7 @@ function filterChatLines(all) {
     if (textOnly.length < 2) continue;
     if (!/[\u4e00-\u9fa5A-Za-z0-9]/.test(textOnly)) continue;
     if (textOnly === prevBody) continue;                   // 连发同一句只留一条
-    // 系统提示与管理动作：不是故事（2026-11-17 实测「主人：暂停100000000」被当成主场景）
+    // 系统提示与管理动作：不是故事（2026-11-17 实测「主人：暂停1000000004」被当成主场景）
     if (/撤回了一条消息|加入了群聊|移出了群聊|修改了群名|邀请.{0,10}加入|禁言|解除禁言/.test(textOnly)) continue;
     if (/^(暂停|继续|开启|关闭|恢复)[\s:：]*\d+$/.test(textOnly)) continue;
     if (/^\d{5,}$/.test(textOnly)) continue;               // 光一坨数字（群号/指令参数）
@@ -8109,7 +8227,7 @@ async function buildMessages(k, userText, extraSystem) {
     //   但「碰到 X 就做 Y」这类规矩类要带上，否则白发「何意味？」她永远只会解释「什么意思」。
     const addressed = addressedToMe(ctx);
     // text 传进去：场景类约定（碰到 X 就回 Y）只在撞上条件时注入，别的时候一个字不提
-    // whoUid：非 QQ 平台带前缀（'bili:100000000'），pactLines 再按人物归拢到他的 QQ 那头 ——
+    // whoUid：非 QQ 平台带前缀（'bili:434882781'），pactLines 再按人物归拢到他的 QQ 那头 ——
     // 2026-11-06 她要求「约定全平台生效」：白在 QQ 定的事，他在 B站 说话照样算。
     const pactTxt = addressed
       ? pactLines(whoUid, { text: userText })
@@ -8206,7 +8324,7 @@ async function buildMessages(k, userText, extraSystem) {
   }
 
   // 这一轮在聊「加群 / 群号 / 拉我进群」时才注入（2026-11-05 从常驻段挪出来，省每轮的 token）。
-  // 真实事故 2026-10-23：主人私聊说「去加群100000000」，她回「已成功加入群100000000」，实测没进群。
+  // 真实事故 2026-10-23：主人私聊说「去加群1126843213」，她回「已成功加入群1126843213」，实测没进群。
   // 硬拦在 qq.js 的 noFakeJoin（发送层还会再闸一遍），这里只管让话术对。
   if (/加群|进群|入群|群号|拉我|邀请我|群邀请|建群|开群/.test(String(userText || ''))) {
     msgs.push({
@@ -8271,7 +8389,7 @@ async function buildMessages(k, userText, extraSystem) {
       content: '这条消息里除了你还 @ 了：' + ctx.othersAt.join('、') + '。\n'
         + '**除机器人外，每个 @ 都是在喊那个人**——被 @ 到 = 被喊到名字，和当面叫名字一个意思：要认得出他是谁（名字在括号前），说到他就叫名字。\n'
         + '按 @ 的顺序和句子语序判断「你 / 他 / 谁」指谁\n'
-        + '（真事 2026-10-22：「@虚幻 @乙 偷你的表情，怎么办」——第一个 @ 是你，紧跟的「你」说的是**你**，偷表情的是另一个 @ 的人，被偷的是你）。\n'
+        + '（真事 2026-10-22：「@虚幻 @大肥鱼 偷你的表情，怎么办」——第一个 @ 是你，紧跟的「你」说的是**你**，偷表情的是另一个 @ 的人，被偷的是你）。\n'
         + '如果主人指名让你对那个人做什么（去骂他、去喊他、告诉他、@ 他），那个人就是被喊到名字的：用名字说他；要对着他说话，就在回复里写他的「@数字」（括号里的那个号），发出去是真正的 @。',
     });
   }
@@ -8451,7 +8569,7 @@ async function buildMessages(k, userText, extraSystem) {
 
   // ===== 记录教学（2026-11-07 主人定）：别人教的话真写盘，不是嘴上说「学到了」=====
   // 落 data/guides/学到的（范围）.md，范围三档（主人 2026-11-13 定）：
-  //   群 → 一群一份；私聊 → 一个人一份（带平台，如「私聊QQ3956934950」）；平台 → 一类一份（如「平台B站」）。
+  //   群 → 一群一份；私聊 → 一个人一份（带平台，如「私聊QQ1000000002」）；平台 → 一类一份（如「平台B站」）。
   // 范围同时决定「读哪份」——一份里出现的人，就是这个范围在场的人；别处的知识不串过来。
   const _src = String((ctx && ctx.source) || 'qq');
   const _plat = ({ qq: 'QQ', bili: 'B站' })[_src] || _src;
@@ -8571,7 +8689,7 @@ async function buildMessages(k, userText, extraSystem) {
         role: 'system',
         content: '## 主人在下指令 / 纠正你（这是任务，不是闲聊）\n'
           + `主人刚说：「${qme.slice(0, 60)}」。按任务处理，别当玩笑混过去：\n`
-          + '- 指令在纠正你的**身份/名字** → 老实认：刚才把名字说错了，你是**虚幻**，别人的名字（大饮尽酱、乙这些）不归你，以后自称只说虚幻。\n'
+          + '- 指令在纠正你的**身份/名字** → 老实认：刚才把名字说错了，你是**虚幻**，别人的名字（大饮尽酱、大肥鱼这些）不归你，以后自称只说虚幻。\n'
           + '- 指令说你哪里**出了毛病/bug** → 当场自查：翻自己刚说过的话，真有这毛病就承认+保证改；查了没这毛病就老实说「我检查了，没这个问题」——不许空口认错，也不许嘴硬。\n'
           + '- 一两句接住任务就好，别撒娇打岔、别复读指令以外的内容。',
       });
@@ -8856,6 +8974,10 @@ async function buildMessages(k, userText, extraSystem) {
       // 搜索「搜了个空」（Bing 把长句拆成单字、结果全被相关性过滤掉了）时，websearch 会回一段说明。
       // 这种情况不能再念「已经搜到了就要讲出来」——那会逼它顺着空气编；改为如实给方向、说清没查到哪部分，不许编数字或结论。
       const miss = /^（联网查过了/.test(String(web));
+      // 2026-11-23 漏洞修补：这段「查过了但没查到」的说明是**非空字符串**，原来只判 !web，
+      // 于是算成「老闸搜到了」→ 按 webOkWho=free 交给免费模型，而不是按 webMissWho 交给我。
+      // 现在同样置 _webNoResult：群里没人点的轮不接话，@/私聊的轮走 _webMissAgent 交给我查。
+      if (miss) msgs._webNoResult = true;
       if (!miss) rememberWeb(k, q, web);
       topicAdd({ type: 'search', who: (getTurn(k) || {}).nick || '', qq: pactStoreKey((getTurn(k) || {}).uid || ''), scope: (getTurn(k) || {}).gid ? '群' + (getTurn(k) || {}).gid : '私聊', text: q + ' → ' + String(web).replace(/\s+/g, ' ').slice(0, 120) });
       if (miss) {
@@ -8948,6 +9070,15 @@ async function buildMessages(k, userText, extraSystem) {
         + '- 只盯着最后一句就答，最容易漏信息、也最容易答错人。\n'
         + '- 上下文里没有的事，就说没有、或者问一句。不许编。',
     });
+    // 2026-11-25 本轮锚定：真链路才拼；自检/守卫无 ctx 时一个字都不加，老断言不破。
+    if (ctx && ctx.source && ctx.source !== 'full') {
+      msgs.push({ role: 'system', content: anchor.rulesText() });
+      // 2026-11-25 多重真相：记录员最近一次结论（没有就不加一个字）
+      try {
+        const _debrief = require('./multi-truth').debrief(k);
+        if (_debrief) msgs.push({ role: 'system', content: _debrief });
+      } catch (e) { /* 没有结论就当没有 */ }
+    }
   }
 
   /* 2026-11-18 主人定：「遇到超长图片就压缩虚幻的提示词，而不要压缩这些字」。
@@ -8960,9 +9091,9 @@ async function buildMessages(k, userText, extraSystem) {
     const keep = utLen > 3000 ? 8 : (utLen > 1500 ? 12 : h.length);
     if (keep < h.length) {
       console.log('[img] 这一轮带了 ' + utLen + ' 字（图上的字），历史只留 ' + keep + ' 条给它让位');
-      msgs.push(...h.slice(-keep));
+      msgs.push(...anchor.renderHistory(h.slice(-keep)));
     } else {
-      msgs.push(...h);
+      msgs.push(...anchor.renderHistory(h));
     }
   }
 
@@ -9045,6 +9176,9 @@ async function buildMessages(k, userText, extraSystem) {
   try {
     const whos = convState.whoListForTurn(ctx && ctx.gid, whoUid);
     const pr = convState.personaFor(whos);
+    // 这一节里有没有「名字」项（有的话要写明它压过身份铁律里的默认名；主人名不受影响）
+    const hasName = pr.global.concat(pr.mine)
+      .some(s => Object.keys(s.parts || {}).some(k => convState.isNameTopic(k)));
     const lines = [];
     for (const s of pr.global) {
       lines.push('·【默认·对所有人都这样】' + s.text);   // 分项已经写在 text 里（「发型：短发」）
@@ -9060,10 +9194,32 @@ async function buildMessages(k, userText, extraSystem) {
           + '\n上面是「你是什么」的设定：和人设正文冲突的地方，一律照这里来——人设正文说她是什么、什么性格、长什么样，'
           + '只要和这里对不上，就按这里的说法。和「约定」里关于你长相 / 性格 / 身份的说法冲突时，也以这里为准（约定是文字太长、'
           + '判不清是谁的要求时留的兜底）。标着【只对现在说话这个人】的，只在这个人跟你说话时成立：换一个人说话、或者没有这个人的时候，'
-          + '你就是默认的虚幻，别把别人给你设的样子带到别人身上，也别主动说自己被谁改成了什么。',
+          + '你就是默认的虚幻，别把别人给你设的样子带到别人身上，也别主动说自己被谁改成了什么。'
+          + (hasName ? '\n这一节里的名字也压过上面「你是谁（身份铁律）」里你自己的名字；主人名字不受影响。' : ''),
       });
     }
   } catch (e) { console.log('[persona] 人设注入失败：' + e.message); }
+
+  /* 「名字」压轴（2026-11-25 主人令：「状态里可以直接把名字改成豆包」，主人名字不变）：
+   * 名字条存在人设层（conv-state 的 NAME_TOPICS），但「身份铁律」在常驻段里写死了默认名，
+   * 必须在最后再加一条、把话说死，才压得过它。没设名字时这一段一个字都不加（零回归）。 */
+  try {
+    const whos = convState.whoListForTurn(ctx && ctx.gid, whoUid);
+    const nm = convState.nameOfTurn(whos);
+    const def = cfg.botName || '虚幻';
+    if (nm && nm.name && nm.name !== def) {
+      msgs.push({
+        role: 'system',
+        content: '## 名字（本轮）\n'
+          + (nm.source === 'mine'
+            ? (String(nm.who || '').indexOf('g:') === 0 ? '（只对这个群）' : '（只对现在说话这个人）')
+            : '')
+          + '你这一轮叫「' + nm.name + '」。说自己时自称' + nm.name + '，别人问你是谁 / 你叫什么，也答' + nm.name + '；不要自称' + def + '。\n'
+          + '主人**没改名**：别人问「谁是你主人」「你主人叫什么」，仍答「' + def + '」；这一轮你和主人不同名，别把主人的名字说成' + nm.name + '。\n'
+          + '上面人设正文 / 身份铁律里的「' + def + '」是你的默认名字，这一节只压过你自己的名字；聊天记录里标「' + def + '」的旧消息也是你之前说的。',
+      });
+    }
+  } catch (e) { console.log('[name] 名字注入失败：' + e.message); }
 
   return msgs;
 }
@@ -9134,7 +9290,7 @@ function reviewAll() {
       a.push({
         id: 'alias:' + pers.pid, rkind: 'alias', pid: pers.pid,
         qq: mainQQ ? people.keyOf(mainQQ) : '', scope: '',
-        // 这个人的全部账号，前端照着「朋友录」的写法列（QQ 100000000 · QQ 100000000 · B站 …）
+        // 这个人的全部账号，前端照着「朋友录」的写法列（QQ 1000000002 · QQ 3486543800 · B站 …）
         accounts: (pers.accounts || []).map(x => ({ platform: String(x.platform || ''), id: String(x.id || '') })),
         name: names[0] || '',
         t: new Date(raw.at || Date.now()).toISOString(),
@@ -9396,6 +9552,7 @@ function reviewReclass(id, target) {
 
 module.exports = {
   init, setMasterDeliver, master,
+  _agentPromptFromMessages: agentPromptFromMessages,   // 自测用：DSH 派活提示词的拼装
   // 自动同意记录：面板与 qq.js 共用，别再各写一份
   ACCEPT_LOG_PATH, acceptLog, acceptLines, acceptNewCount, acceptNewList, acceptMarkRead,
   isGarbageReply,

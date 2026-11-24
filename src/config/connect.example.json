@@ -1,0 +1,17 @@
+{
+  "napcatWsUrl": "ws://127.0.0.1:3001",
+  "napcatToken": "",
+  "selfQQ": 0,
+  "masterQQ": 0,
+  "oniiQQ": 0,
+  "oniiGroup": 0,
+  "testGroup": 0,
+  "people": {},
+  "masters": [
+    "3486543800"
+  ],
+  "peerAI": [
+    "3779714173"
+  ],
+  "botQQ": []
+}
