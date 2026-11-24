@@ -1,0 +1,72 @@
+/* 第三方日记插件适配层（2026-11-17 主人令：「我让你去下插件，让你去接插件」）。
+ *
+ * 装的是 EtafCisky/sillytavernDIARY v7.2.1，原文在 src/vendor/sillytavernDIARY/。
+ * 这里**不重写它的逻辑**，只做三件事：
+ *   ① 用动态 import 把它的 PromptBuilder / parseDiaryBlock 拿进来（它是 ESM，主程序是 CJS）；
+ *   ② 把它的日记格式要求（<日记>标题/时间/内容</日记>）取出来，接进我们写日记的提示词；
+ *   ③ 用它自己的解析器把模型输出拆成 标题 / 时间 / 内容，解析失败按它的规矩判失败。
+ *
+ * 插件升级 → 覆盖 vendor 目录即可，这里不用改（只依赖它导出的两个名字）。
+ * 插件目录里放了 package.json{"type":"module"}，所以 .js 按 ESM 解析，不会刷警告。 */
+const path = require('path');
+const { pathToFileURL } = require('url');
+
+const VENDOR = path.join(__dirname, 'vendor', 'sillytavernDIARY', 'src');
+const VERSION = (() => {
+  try { return require(path.join(__dirname, 'vendor', 'sillytavernDIARY', 'manifest.json')).version || ''; }
+  catch { return ''; }
+})();
+
+let _mod = null;
+let _loading = null;
+
+/* 懒加载一次。加载失败不抛给调用方 —— 日记不能因为插件不在就整条断掉。 */
+function loadPlugin() {
+  if (_mod) return Promise.resolve(_mod);
+  if (_loading) return _loading;
+  _loading = (async () => {
+    try {
+      const pb = await import(pathToFileURL(path.join(VENDOR, 'prompts', 'prompt-builder.js')).href);
+      const ps = await import(pathToFileURL(path.join(VENDOR, 'parser', 'diary-parser.js')).href);
+      _mod = {
+        ok: true,
+        version: VERSION,
+        PromptBuilder: pb.PromptBuilder,
+        parseDiaryBlock: ps.parseDiaryBlock,
+        ExchangeDiaryFormatValidator: ps.ExchangeDiaryFormatValidator,
+      };
+    } catch (e) {
+      console.error('[diary-plugin] 插件加载失败，日记退回纯规则模式：' + e.message);
+      _mod = { ok: false, error: e.message, version: VERSION };
+    }
+    return _mod;
+  })();
+  return _loading;
+}
+
+/* 插件规定的日记格式，原句来自它 diary-writing-manager.js 的 DIARY_PROMPT_TEMPLATE：
+ *   「以{{char}}的口吻写一则日记，日记内容字数不得少于500字，日记格式如下：<日记>标题：…时间：…内容：…</日记>」
+ * 这里只搬格式与字数两块，身份和写法仍由我们自己的规则给（人设在 soul/虚幻.md）。 */
+function formatBlock(botName, minChars) {
+  const n = Number(minChars) > 0 ? Number(minChars) : 500;
+  return '【日记格式】（照这个格式输出，模型才能把它存成一条日记）\n'
+    + '<日记>\n标题：这一天的标题，一句话\n时间：这一天的日期\n内容：日记正文\n</日记>\n'
+    + '正文不少于 ' + n + ' 字。三个字段一个都不能少，缺一个这篇就存不下来。';
+}
+
+/* 解析模型输出。插件自己的 parseDiaryBlock 认 <日记>…</日记>；没有标签时返回失败，
+ * 这时我们只取正文兜底，并在返回值里标 parsed:false，让调用方决定要不要重写。 */
+async function parseDiary(text) {
+  const s = String(text || '');
+  const m = await loadPlugin();
+  if (m.ok && typeof m.parseDiaryBlock === 'function') {
+    const r = m.parseDiaryBlock(s);
+    if (r && r.success) {
+      return { ok: true, title: r.title, time: r.time, content: r.content, parsed: true, plugin: m.version };
+    }
+    return { ok: false, error: (r && r.error) || '解析失败', content: s.trim(), parsed: false, plugin: m.version };
+  }
+  return { ok: false, error: '插件没加载上', content: s.trim(), parsed: false, plugin: VERSION };
+}
+
+module.exports = { loadPlugin, formatBlock, parseDiary, VERSION };

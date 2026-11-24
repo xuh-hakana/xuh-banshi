@@ -1,0 +1,505 @@
+{
+  "video": {
+    "enable": true,
+    "frameIntervalSec": 8,
+    "briefFrameCount": 3,
+    "briefSubtitleChars": 60,
+    "fullMaxFrames": 24,
+    "maxFullSeconds": 600,
+    "briefTimeoutMs": 45000,
+    "fullTimeoutMs": 90000,
+    "ffmpegBin": "",
+    "ffprobeBin": "",
+    "whisperBin": "",
+    "asrModel": "",
+    "asrLang": "zh",
+    "asrThreads": 4
+  },
+  "learn": {
+    "enabled": true,
+    "decay": true,
+    "hotChars": 700,
+    "styleHotChars": 700,
+    "warm": true,
+    "acts": true,
+    "tickMin": 30,
+    "dsh": true,
+    "dshChars": 700,
+    "astrbot": true,
+    "astrbotChars": 400,
+    "mood": true,
+    "moodChars": 200
+  },
+  "sendGuard": {
+    "enabled": true,
+    "ackTimeoutMs": 8000,
+    "maxTries": 3,
+    "verify": true
+  },
+  "stickerAutoDesc": false,
+  "noRecordGroups": [
+    100000000
+  ],
+  "bilibiliMonitor": {
+    "mids": [
+      "30895294",
+      "3546586044959477"
+    ],
+    "note": "B站监测账号：默认我和小号两个。面板可增删；既用于主页切换，也用于评论区采集（被@/虚幻发言）。"
+  },
+  "bilibiliComment": {
+    "enabled": false,
+    "oids": [],
+    "pages": 2,
+    "everyMin": 60,
+    "mention": {
+      "enabled": true,
+      "keyword": "收图",
+      "everySec": 60,
+      "reply": true,
+      "minFavor": 60,
+      "masterMids": [
+        30895294
+      ]
+    }
+  },
+  "bilibiliEngage": {
+    "enabled": false,
+    "reply": {
+      "enabled": true,
+      "scope": "own",
+      "mids": [],
+      "pages": 1,
+      "videoPs": 10,
+      "maxPerRun": 3,
+      "cooldownMs": 8000,
+      "everyMin": 15
+    },
+    "support": {
+      "enabled": true,
+      "minFavor": 20,
+      "actions": [
+        "like",
+        "favorite",
+        "comment"
+      ],
+      "commentText": "",
+      "videoPs": 10,
+      "maxPerRun": 5,
+      "cooldownMs": 5000,
+      "windowSec": 604800,
+      "everyMin": 30
+    }
+  },
+  "bilibiliDM": {
+    "enabled": false,
+    "everySec": 30,
+    "masterMids": [],
+    "replyStrangers": false,
+    "lineCooldownMs": 60000
+  },
+  "historyLimit": 60,
+  "extractEvery": 24,
+  "triggers": [],
+  "autoAsk": {
+    "enabled": true,
+    "minLength": 5,
+    "cooldownMs": 12000,
+    "maxPerMinute": 3
+  },
+  "chime": {
+    "enabled": true,
+    "p": 0.045,
+    "cooldownMs": 480000,
+    "dailyMax": 40,
+    "minLength": 4,
+    "warmupMin": 30,
+    "warmupHour": 20,
+    "warmupP": 0.07
+  },
+  "merge": {
+    "enabled": true,
+    "masterWaitMs": 6000,
+    "masterCoolMs": 360000,
+    "otherWaitMs": 1500,
+    "atMeWaitMs": 1500,
+    "maxMs": 180000,
+    "maxPieces": 12,
+    "maxChars": 800,
+    "joiner": "\n"
+  },
+  "topic": {
+    "enabled": true,
+    "windowMs": 90000,
+    "minGapMs": 20000,
+    "minLength": 3,
+    "p": 0.25,
+    "dailyMax": 60,
+    "minRecordLen": 10,
+    "hitP": 0.6
+  },
+  "offline": {
+    "line": "我现在有点忙，让我的主人替我回答吧",
+    "pool": [
+      {
+        "id": "fb-default-1",
+        "text": "我现在有点忙，让我的主人替我回答吧",
+        "scope": "",
+        "enabled": true
+      },
+      {
+        "id": "fb-auto-mwfnrru9-0",
+        "text": "现在开始想四句，每句不同：",
+        "scope": "",
+        "enabled": true
+      },
+      {
+        "id": "fb-auto-mwfnrru9-1",
+        "text": "我现在有点忙，等下让主人来回应你～ （18字）",
+        "scope": "",
+        "enabled": true
+      },
+      {
+        "id": "fb-auto-mwfnrru9-2",
+        "text": "我现在有点忙碌，先找主人帮忙呀～ （16字）",
+        "scope": "",
+        "enabled": true
+      },
+      {
+        "id": "fb-auto-mwfnrru9-3",
+        "text": "我现在有点忙，等下让主人解答～ （15字）",
+        "scope": "",
+        "enabled": true
+      }
+    ],
+    "syncToMaster": true,
+    "lineCooldownMs": 60000,
+    "syncCooldownMs": 120000
+  },
+  "critic": {
+    "p": 0.3,
+    "windowMs": 10000
+  },
+  "grpAuto": {
+    "min": 15,
+    "max": 20,
+    "hotMin": 4,
+    "hotMax": 10,
+    "hotMsMin": 18000,
+    "hotMsMax": 120000
+  },
+  "qzone": {
+    "enabled": true,
+    "everyHours": 3,
+    "friendComment": {
+      "enabled": true,
+      "skipMaster": true
+    }
+  },
+  "context": {
+    "groupUp": 10,
+    "groupDown": 3,
+    "personUp": 5,
+    "historyLimit": 40,
+    "historyChars": 8000,
+    "imgDescChars": 1200,
+    "chatShowLimit": 200,
+    "liveThink": 1
+  },
+  "split": {
+    "enabled": true,
+    "p": 0.7,
+    "minChars": 14,
+    "maxSeg": 3
+  },
+  "poke": {
+    "enabled": true,
+    "reply": true,
+    "cooldownMs": 3000
+  },
+  "autoAccept": {
+    "friend": true,
+    "groupInvite": true
+  },
+  "healthRemind": {
+    "enabled": true,
+    "groupId": 100000000,
+    "atKeys": [
+      "masterQQ",
+      "oniiQQ",
+      "100000000",
+      "100000000"
+    ],
+    "workdays": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "workStartHour": 14,
+    "workEndHour": 22,
+    "quietStartHour": 24,
+    "quietEndHour": 9,
+    "minGapMin": 90,
+    "speakDelayMin": 2,
+    "dailyMin": 1,
+    "dailyMax": 12,
+    "tickIntervalSec": 1,
+    "weeklyExtraMin": 1,
+    "delayMinMin": 3,
+    "delayMaxMin": 30,
+    "makeupAsWorkday": false,
+    "holidayUrl": "https://publicapi.xiaoai.me/holiday/year?date={year}",
+    "holidayBackupUrl": "https://api.jiejiariapi.com/v1/holidays/{year}",
+    "holidayCacheDays": 7,
+    "mainWork": [
+      {
+        "act": "提肛"
+      },
+      {
+        "act": "提臀"
+      },
+      {
+        "act": "换腿坐"
+      },
+      {
+        "act": "拉伸腿"
+      },
+      {
+        "act": "拉伸背"
+      },
+      {
+        "act": "拉伸腰"
+      },
+      {
+        "act": "拉伸脖子"
+      },
+      {
+        "act": "压腿"
+      },
+      {
+        "act": "伸腰"
+      },
+      {
+        "act": "抬头"
+      }
+    ],
+    "mainRest": [
+      {
+        "act": "头顶中心向上顶"
+      },
+      {
+        "act": "沉肩且齐胯"
+      },
+      {
+        "act": "换腿坐"
+      },
+      {
+        "act": "腹部发力收腹"
+      },
+      {
+        "act": "提肛"
+      },
+      {
+        "act": "提臀"
+      }
+    ],
+    "extraWork": [
+      {
+        "act": "靠墙静蹲"
+      },
+      {
+        "act": "坐姿提踵"
+      },
+      {
+        "act": "肩胛收紧"
+      },
+      {
+        "act": "椅子转体"
+      },
+      {
+        "act": "颈部抗阻"
+      }
+    ],
+    "extraRest": [
+      {
+        "act": "波比跳"
+      },
+      {
+        "act": "俯卧撑"
+      },
+      {
+        "act": "臀桥"
+      },
+      {
+        "act": "深蹲"
+      },
+      {
+        "act": "平板支撑"
+      },
+      {
+        "act": "弓步拉伸"
+      }
+    ]
+  },
+  "dailyReport": {
+    "enabled": true,
+    "banshiDataDir": "",
+    "maxChars": 600,
+    "note": "上线日报（昨日数据）：0 点后首次在线发主人群，一条消息；enabled=false 关掉；banshiDataDir 空=自动找 ~/.astrbot/.../astrbot_plugin_banshi_auto/data"
+  },
+  "movePoop": {
+    "enabled": false,
+    "mode": "plain",
+    "pollSeconds": 3,
+    "sourceGroups": [],
+    "targetGroups": [],
+    "waitSeconds": 2,
+    "cacheMaxSeconds": 300,
+    "cooldownDaySeconds": 0,
+    "cooldownNightSeconds": 0,
+    "cooldownDayStart": "09:00",
+    "cooldownNightStart": "01:00",
+    "minGoodMinusBad": 0,
+    "allowedTypes": [
+      "text",
+      "image",
+      "video",
+      "forward"
+    ],
+    "batchSize": 24
+  },
+  "biliDynamic": {
+    "enabled": true,
+    "dailyCap": 10,
+    "gapSeconds": 600,
+    "windows": [
+      [
+        "09:00",
+        "14:00"
+      ],
+      [
+        "18:00",
+        "22:00"
+      ]
+    ],
+    "maxImages": 9,
+    "retryMax": 5,
+    "blockedKeepDays": 7,
+    "blockedMaxFiles": 300,
+    "pornCensorEnabled": true,
+    "pornMinConfidence": 0.6,
+    "pollSeconds": 60,
+    "maxIngestPerTick": 20
+  },
+  "poopQuality": {
+    "enabled": true,
+    "windowSeconds": 300,
+    "gramSize": 2,
+    "minOverlap": 0.34,
+    "minSharedGrams": 2,
+    "keepDays": 7,
+    "maxKeys": 5000
+  },
+  "rocoMerchant": {
+    "enabled": true,
+    "groupId": 100000000,
+    "tag": "洛克王国",
+    "watchItems": [
+      "棱镜球",
+      "祝福项坠",
+      "炫彩蛋",
+      "炫彩精灵蛋"
+    ],
+    "dataUrl": "https://qi-du-shang.github.io/data.json",
+    "roundHours": [
+      8,
+      12,
+      16,
+      20
+    ],
+    "offsetsMin": [
+      5,
+      35
+    ],
+    "retrySec": 300,
+    "skipStale": true,
+    "rarity": {
+      "棱镜球": 3,
+      "祝福项坠": 2,
+      "炫彩蛋": 1,
+      "炫彩精灵蛋": 1
+    },
+    "note": "洛克王国远行商人：一天 8/12/16/20 四轮，每轮只在 +5、+35 分查一次；本轮有棱镜球/祝福项坠/炫彩蛋就 @ 固定标签「洛克王国」且接受提醒的人；群消息只在出现的 4 小时内补发，过窗不补。rarity 是稀有度排名（数字越大越稀有），B站 那条线按它分每日额度，并且只在前 3.5 小时发。"
+  },
+  "rocoBili": {
+    "enabled": true,
+    "keyword": "洛克王国",
+    "triggerItems": [
+      "棱镜球",
+      "祝福项坠",
+      "炫彩蛋"
+    ],
+    "windowBeforeMin": 60,
+    "windowAfterMin": 210,
+    "scanGapSec": 420,
+    "gapSecMin": 150,
+    "gapSecMax": 240,
+    "maxPerRound": 10,
+    "maxPerDay": 10,
+    "maxRarePerDay": 10,
+    "commonOnlyWhenRareLeft": true,
+    "maxPerScan": 2,
+    "searchPages": 2,
+    "useModel": false,
+    "note": "棱镜球/祝福项坠/炫彩蛋轮次触发：一轮 4 小时，只在前 3.5 小时内发；前 2 小时只发粉丝/其他视频过万的 UP，之后 1.5 小时小 UP 也发、把额度花满（额度早花完就没有这一步）。文案写「几点到几点 + 本轮全部命中的商品 + 颜文字」，像人说话。标签：手游白名单「洛克王国：世界」/「洛克王国世界」为强判据；只有「洛克王国世界激励计划」的弱判据要粉丝 ≥1万 且标题/简介不带页游字样；带「页游」tag 一律不发。粉丝档对所有发送都生效（A>B>C），但只在挑人顺序上——不是「小 UP 永远不发」。额度按稀有度分账：稀有（棱镜球/祝福项坠）每天 ≤maxRarePerDay 独立额度（普通发满仍可再发 10 条）；普通（炫彩蛋）只在稀有没发满时发且吃 maxPerDay。被回复：先按 mid 录人物表，再挑高频问题（为什么发/主人是谁/真的假的/污染评论区/AI）回一句，每天 ≤8 条、间隔 ≥300 秒，问主人时顺带 @ 主人。 回评以「虚幻」本人口吻说（短句、嘻嘻/呜、句末不带句号），带可爱颜文字或B站表情；问主人时用 at_name_to_mid 真 @ 主人。 评论文案默认走模板（8→12 条，时间+全部商品+可爱表情），要模型现写就在面板把 useModel 打开。",
+    "mobileTags": [
+      "洛克王国：世界",
+      "洛克王国世界"
+    ],
+    "weakTags": [
+      "洛克王国世界激励计划"
+    ],
+    "weakTagFansMin": 10000,
+    "weakTagEnabled": true,
+    "softBlockWords": [
+      "页游",
+      "系别赛",
+      "网页版"
+    ],
+    "preferFansMin": 10000,
+    "preferPlayMin": 10000,
+    "minTier": "B",
+    "upCacheHours": 24,
+    "upCheckPerTick": 8,
+    "blockTagWords": [
+      "页游"
+    ],
+    "tagCheckPerTick": 8,
+    "tagCacheHours": 12,
+    "recordRepliers": true,
+    "replyPollMin": 10,
+    "replyWatchHours": 48,
+    "bigUpUntilMin": 120,
+    "lateAllowC": true,
+    "replyEnabled": true,
+    "replyMaxPerPoll": 1,
+    "replyMaxPerDay": 8,
+    "replyGapSec": 300,
+    "replyUseModel": true,
+    "masterBiliMid": "30895294",
+    "masterBiliName": "虚幻的生物",
+    "replyAtMaster": true
+  },
+  "alarms": {
+    "enabled": true,
+    "maxDays": 180,
+    "fallbackHours": 24,
+    "tickSec": 30,
+    "overdueHours": 48,
+    "maxKeep": 500,
+    "gateWords": []
+  }
+}

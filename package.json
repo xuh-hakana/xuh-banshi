@@ -1,0 +1,26 @@
+{
+  "name": "xuhbot",
+  "version": "0.2.0",
+  "private": true,
+  "description": "虚幻 — QQ 陪伴机器人（NapCat + OneBot 11 + LLM），含管理面板与桌面客户端",
+  "main": "src/bot.js",
+  "scripts": {
+    "bot": "node src/bot.js",
+    "panel": "node src/server/panel.js",
+    "client": "electron app",
+    "test": "cd src && node ../tests/test-all.js && node ../tests/test-person-save.js && node ../tests/test-call-names.js && node ../tests/test-role.js && node ../tests/test-video.js && node ../tests/test-bili-censor.js && node ../tests/test-bili-publisher.js && node ../tests/test-bili-blocked.js && node ../tests/test-bili-porn-block.js && node ../tests/test-daily-stats.js",
+    "test:person-save": "node tests/test-person-save.js",
+    "build:human": "node scripts/build-human.js",
+    "bot:any": "bash scripts/node.sh src/bot.js",
+    "panel:any": "bash scripts/node.sh src/server/panel.js",
+    "test:any": "bash scripts/node.sh tests/test-all.js",
+    "test:daily-stats": "node tests/test-daily-stats.js",
+    "test:mem": "bash scripts/node.sh tests/test-img-cache.js",
+    "bench:img": "bash scripts/node.sh scripts/mem-bench.js"
+  },
+  "dependencies": {
+    "bilibili-live-ws": "^6.3.1",
+    "dicescript": "^0.2.0",
+    "ws": "^8.18.0"
+  }
+}

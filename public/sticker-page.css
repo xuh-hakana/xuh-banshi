@@ -1,0 +1,217 @@
+/* ===========================================================================
+   public/sticker-page.css — 表情包管理页的样式（面板与客户端共用）
+
+   2026-11-03 从 panel.html 的 <style> 里整段搬出，规则本身一个字没改，
+   只在每条前面加了 .sp-scope —— 这样同一份样式既能用在面板（#content
+   加 class="sp-scope"），也能用在客户端（表情包视图容器加 sp-scope），
+   不会污染外面的界面。
+
+   粉色 #e8608f 是主人定的主色（和她的角色同色），别改成蓝色系。
+   =========================================================================== */
+
+/* 面板那套变量，放在作用域里，不影响客户端其它页面 */
+.sp-scope {
+  --bg:#f6f7f9; --panel:#ffffff; --bd:#ecedf1; --bd2:#e3e4ea;
+  --tx:#1b1c1f; --tx2:#5c5f66; --sub:#9a9da6;
+  --ac:#e8608f; --ac2:#f7e4ec; --ac3:#fdf2f6;
+  --ok:#22a06b; --warn:#e8a33d; --danger:#e5484d;
+  --r:14px; --r2:10px;
+  --sh:0 1px 2px rgba(20,20,30,.04);
+  --sh2:0 4px 16px rgba(20,20,30,.08);
+
+  color: var(--tx);
+  font: 13.5px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.sp-scope * { box-sizing: border-box; }
+.sp-scope button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+.sp-scope input, .sp-scope textarea { font: inherit; color: inherit; }
+.sp-scope .grow { flex: 1; }
+.sp-scope .crumb { font-size:11.5px; color:var(--sub); margin:0 0 2px }
+.sp-scope .crumb b { color:var(--tx2); font-weight:600 }
+.sp-scope .pg { font-size:19px; font-weight:650; margin:2px 0 4px; letter-spacing:-.01em }
+.sp-scope .pgsub { font-size:11.5px; color:var(--tx2); margin:0 0 8px; line-height:1.65 }
+.sp-scope .empty { font-size:12.5px; color:var(--sub); padding:16px 2px }
+.sp-scope .cap { font-size:11.5px; color:var(--sub) }
+.sp-scope .on { color:var(--ok) }
+.sp-scope .off { color:var(--sub) }
+.sp-scope .danger { color:var(--danger) }
+.sp-scope .rn { font-weight:600 }
+
+/* ==========================================================
+   情绪表情页（2026-11-01 重排）：一页里 5 块统一成卡片，
+   表情包图直接看得见（不再是悬停看名字），图能在类别之间拖。
+   ========================================================== */
+.sp-scope .sk-sum{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
+/* 2026-11-07 版头压缩（主人第 5 条「版头太占空间」）：
+   chip 里只留「名字 + 数字」，单位/权重全进悬停说明；对账那三个数跟在后面，用竖线隔开。 */
+.sp-scope .sk-sum-lite {gap:6px;margin:4px 0 6px;align-items:center}
+.sp-scope .sk-sum-lite .sk-chip{padding:2px 9px;font-size:11px;background:#fff;gap:6px}
+.sp-scope .sk-sum-lite .sk-chip b{font-size:12px;margin-left:2px}
+.sp-scope .sk-recline{display:inline-flex;gap:5px;align-items:center;margin-left:2px;padding-left:9px;
+  border-left:1px solid var(--bd2)}
+.sp-scope .sk-chip-mini{padding:2px 7px;font-size:10.5px;background:#fafbfc;color:var(--tx2)}
+/* 区块容器：④ ③ ① ② ⑤ 各占一段，顺序由 JS 决定 */
+.sp-scope .sk-sec{margin:0 0 2px}
+.sp-scope .sk-sec:last-child{margin-bottom:0}
+/* ③ 还没进表的图：正常有两三百张（「少用/」整池都在里面），不加高度限制会把下面两张表挤到三屏以外。
+   限高 300px、里面自己滚；想找某张用 Ctrl+F 或者先缩小窗口宽度。 */
+.sp-scope .sk-unfiled{display:flex;flex-wrap:wrap;gap:6px;max-height:212px;overflow:auto;
+  padding:2px 2px 4px;border-radius:8px}
+.sp-scope .sk-unfiled:hover{background:#fcfcfd}
+/* 小节标题（原来只有面板全局样式里有，客户端没有，显得一整片文字压下来） */
+.sp-scope .tgroup{font-size:12px;font-weight:700;color:var(--tx2);margin:12px 0 6px;
+  padding-bottom:4px;border-bottom:1px dashed var(--bd2)}
+.sp-scope .sk-chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--tx2);
+  background:#fff;border:1px solid var(--bd);border-radius:999px;padding:3px 10px;line-height:1.5}
+.sp-scope .sk-chip b{font-weight:650;color:var(--tx);font-variant-numeric:tabular-nums}
+.sp-scope .sk-chip .u{font-size:10.5px;color:var(--sub)}
+.sp-scope .sk-chip.bad{border-color:#f3c9c9;background:#fffafa;color:#a63b38}
+.sp-scope .sk-chip.bad b{color:#a63b38}
+.sp-scope .sk-chip.ok{border-color:#cde9d9;background:#f7fdf9;color:#1c7d55}
+.sp-scope .sk-chip.ok b{color:#1c7d55}
+.sp-scope .sk-toolbar{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px}
+.sp-scope .sk-tool{font-size:11.5px;color:var(--tx2);background:#f7f8fa;border:1px solid var(--bd2);
+  border-radius:999px;padding:4px 10px;line-height:1.5;
+  transition:background .12s,border-color .12s,color .12s}
+.sp-scope .sk-tool:hover{background:var(--ac3);border-color:var(--ac);color:var(--ac)}
+.sp-scope .sk-tool.on{border-color:#52c41a;color:#389e0d;background:#f6ffed}
+.sp-scope .sk-tool[disabled]{opacity:.5;pointer-events:none}
+.sp-scope .sk-tool.danger:hover{background:#fdeaea;border-color:#f0b8b8;color:var(--danger)}
+.sp-scope .sk-card{background:#fff;border:1px solid var(--bd);border-radius:11px;padding:8px 11px 9px;
+  margin-bottom:8px;box-shadow:var(--sh);
+  transition:border-color .12s,box-shadow .12s,background .12s}
+/* 场合表用网格排：一类一张卡，屏宽够就两列，164 类也不用滚到天荒地老 */
+.sp-scope .sk-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:8px;align-items:start}
+.sp-scope .sk-list>.sk-card{margin-bottom:0}
+/* @media (max-width:900px){.sk-list{grid-template-columns:1fr}} */
+.sp-scope .sk-card.over{border-color:var(--ac);box-shadow:0 0 0 3px var(--ac3)}
+.sp-scope .sk-card.auto{background:#fffdf4;border-color:#f2e3b6}
+.sp-scope .sk-card.slim{padding:10px 12px}
+.sp-scope .sk-row{display:flex;align-items:center;gap:6px}
+.sp-scope .sk-handle{flex:0 0 auto;color:#cfd2da;font-size:13px;line-height:1;cursor:grab;user-select:none;
+  padding:4px 2px;border-radius:6px}
+.sp-scope .sk-handle:hover{color:var(--ac);background:var(--ac3)}
+.sp-scope .sk-handle:active{cursor:grabbing}
+.sp-scope .sk-desc{flex:1;min-width:120px;border:0;background:transparent;font-size:13.5px;color:var(--tx);
+  padding:5px 2px;border-bottom:1px solid transparent;transition:border-color .12s}
+.sp-scope .sk-desc:focus{border-bottom-color:var(--ac)}
+.sp-scope .sk-desc::placeholder{color:#b9bcc5}
+.sp-scope .sk-cnt{flex:0 0 auto;font-size:11px;color:#2e7d4f;background:#f0f8f2;border:1px solid #bfe0cc;
+  border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sp-scope .sk-cnt.off{color:#a44e42;background:#fbf1ef;border-color:#eac6bf}
+.sp-scope .sk-tools{flex:0 0 auto;display:flex;gap:1px;opacity:0;transition:opacity .12s}
+.sp-scope .sk-card:hover .sk-tools,.sk-card:focus-within .sk-tools{opacity:1}
+.sp-scope .sk-tool.sm{font-size:11px;padding:3px 7px;border-radius:7px;border-color:transparent;background:transparent}
+.sp-scope .sk-tool.sm:hover{background:#f2f3f7;border-color:transparent;color:var(--tx)}
+.sp-scope .sk-tool.sm.danger:hover{background:#fdeaea;color:var(--danger)}
+.sp-scope .sk-thumbs{display:flex;flex-wrap:wrap;gap:5px;margin:7px 0 1px;align-items:flex-start}
+.sp-scope .sk-th{position:relative;width:44px;height:44px;border-radius:8px;overflow:hidden;background:#f3f4f7;
+  border:1px solid var(--bd);cursor:grab;flex:0 0 auto}
+/* 缩略图 + 图名（2026-11-01 主人：图片名字本身也是提示词的一部分，必须看得见） */
+.sp-scope .sk-thw{display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto;max-width:64px}
+.sp-scope .sk-thw .sk-nm{font-size:10px;line-height:1.25;color:var(--tx2);max-width:64px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;text-align:center;cursor:default}
+/* 图名可点 = 改图片名（2026-11-01 主人：能在面板直接改） */
+.sp-scope .sk-nm.rn{cursor:pointer;border-bottom:1px dashed transparent}
+.sp-scope .sk-nm.rn:hover{color:var(--ac);border-bottom-color:var(--ac)}
+/* 改图片名的小弹层（自绘，不用浏览器原生 prompt） */
+.sp-scope .sk-rd{position:fixed;inset:0;z-index:320;background:rgba(16,18,22,.5);display:flex;
+  align-items:center;justify-content:center;padding:20px}
+.sp-scope .sk-rdc{width:min(470px,92vw);background:#fff;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.28);
+  padding:15px 18px 13px}
+.sp-scope .sk-rdt{font-size:14px;font-weight:650;margin-bottom:10px}
+.sp-scope .sk-rdrow{display:flex;align-items:flex-start;gap:10px;margin:2px 0 4px}
+.sp-scope .sk-rdp{width:58px;height:58px;border-radius:10px;overflow:hidden;border:1px solid var(--bd);
+  background:#f3f4f7;flex:0 0 auto}
+.sp-scope .sk-rdp img{width:100%;height:100%;object-fit:cover;display:block}
+.sp-scope .sk-rdold{font-size:11.5px;color:var(--sub);margin-bottom:5px}
+.sp-scope .sk-rdin{width:100%;border:1px solid var(--ac);border-radius:9px;padding:6px 10px;font-size:13.5px;
+  color:var(--tx);background:#fff}
+.sp-scope .sk-rdtip{font-size:11.5px;color:var(--tx2);line-height:1.8;margin:9px 0 6px}
+.sp-scope .sk-rderr{font-size:11.5px;color:var(--danger);min-height:17px;line-height:1.6}
+.sp-scope .sk-rdbar{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.sp-scope .sk-th img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.sp-scope .sk-th:hover{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac3)}
+.sp-scope .sk-th:active{cursor:grabbing}
+.sp-scope .sk-th.dragging{opacity:.32}
+.sp-scope .sk-th .x{position:absolute;top:1px;right:1px;width:15px;height:15px;line-height:13px;text-align:center;
+  border-radius:50%;background:rgba(24,26,32,.62);color:#fff;font-size:11px;opacity:0;
+  transition:opacity .12s;cursor:pointer;font-style:normal}
+.sp-scope .sk-th:hover .x{opacity:1}
+.sp-scope .sk-th .x:hover{background:#c0392b}
+/* 左上角那个「−」= 这一类不用它（2026-11-07：叉改成删图之后，老功能换个位置留着） */
+.sp-scope .sk-th .rm{position:absolute;top:1px;left:1px;width:15px;height:15px;line-height:13px;text-align:center;
+  border-radius:50%;background:rgba(24,26,32,.62);color:#fff;font-size:12px;opacity:0;
+  transition:opacity .12s;cursor:pointer;font-style:normal}
+.sp-scope .sk-th:hover .rm{opacity:1}
+.sp-scope .sk-th .rm:hover{background:#8a8f9c}
+.sp-scope .sk-th.miss{display:flex;align-items:center;justify-content:center;font-size:10px;color:#a44e42;
+  background:#fbf1ef;border-style:dashed}
+.sp-scope .sk-drop{display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#c3c6cf;
+  border:1px dashed var(--bd2);border-radius:9px;padding:11px;background:#fcfcfd;margin-top:8px}
+.sp-scope .sk-card.over .sk-drop{border-color:var(--ac);color:var(--ac);background:var(--ac3)}
+.sp-scope .sk-trow{display:flex;align-items:center;gap:6px;padding:5px 2px;border-bottom:1px solid #f2f3f6}
+.sp-scope .sk-trow:last-child{border-bottom:0}
+.sp-scope .sk-in{border:1px solid var(--bd2);border-radius:8px;background:#fff;padding:5px 8px;font-size:12.5px;
+  color:var(--tx);transition:border-color .12s}
+.sp-scope .sk-in:focus{border-color:var(--ac)}
+.sp-scope .sk-in::placeholder{color:#b9bcc5}
+.sp-scope .sk-help{margin:14px 0 4px;border:1px solid var(--bd);border-radius:10px;background:#fbfbfd;
+  padding:9px 12px;font-size:11.5px;color:var(--tx2)}
+.sp-scope .sk-help>summary{cursor:pointer;font-weight:600;outline:none;list-style:none}
+.sp-scope .sk-help>summary::-webkit-details-marker{display:none}
+.sp-scope .sk-help>summary::before{content:'▸ ';color:var(--sub)}
+.sp-scope .sk-help[open]>summary::before{content:'▾ '}
+.sp-scope .sk-help .body{white-space:pre-wrap;line-height:1.9;margin-top:8px;color:var(--tx2)}
+.sp-scope .sk-lb{position:fixed;inset:0;z-index:300;background:rgba(16,18,22,.8);display:flex;
+  align-items:center;justify-content:center;cursor:default;padding:22px 22px 88px}
+.sp-scope .sk-lbv{max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center}
+.sp-scope .sk-lb img{max-width:86vw;max-height:calc(100vh - 148px);border-radius:12px;background:#fff;
+  box-shadow:0 20px 60px rgba(0,0,0,.45)}
+/* 看图浮层底部那条：图名 / 第几张 / 在哪个文件夹 + 翻页改名删图 */
+.sp-scope .sk-lbbar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:14px;
+  padding:12px 20px 16px;background:linear-gradient(to top,rgba(12,14,18,.94),rgba(12,14,18,.6) 70%,rgba(12,14,18,0))}
+.sp-scope .sk-lbinfo{flex:1;min-width:0}
+.sp-scope .sk-lbnm{font-size:14px;font-weight:650;color:#fff;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-scope .sk-lbmeta{font-size:11.5px;color:rgba(255,255,255,.62);line-height:1.6;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-scope .sk-lbt{display:flex;gap:6px;flex:0 0 auto}
+.sp-scope .sk-lbbar .sk-tool{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.2);color:#fff;font-size:12px;padding:5px 12px}
+.sp-scope .sk-lbbar .sk-tool:hover{background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.34);color:#fff}
+.sp-scope .sk-lbbar .sk-tool.danger{color:#ffc2c2}
+.sp-scope .sk-lbbar .sk-tool.danger:hover{background:#c0392b;border-color:#c0392b;color:#fff}
+.sp-scope .sk-lbbar .sk-tool[disabled]{opacity:.32;pointer-events:none}
+/* 删图确认层 */
+.sp-scope .sk-delc{width:min(520px,94vw)}
+.sp-scope .sk-deltip{font-size:11.5px;color:var(--tx2);line-height:1.8;margin-top:6px}
+.sp-scope .sk-delbtn{background:#c0392b;border-color:#c0392b;color:#fff}
+.sp-scope .sk-delbtn:hover{background:#a52f24;border-color:#a52f24;color:#fff}
+/* 提示词清单状态条 + 只读弹层（2026-11-01 主人定：清单是生成的，提示词只读它） */
+.sp-scope .sk-ptb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 8px;padding:5px 9px;
+  border:1px solid var(--bd);border-radius:9px;background:#f7f8fb}
+.sp-scope .sk-ptx{font-size:11.5px;color:var(--tx2);flex:1;min-width:200px;line-height:1.6}
+.sp-scope .sk-lb.sk-pv{cursor:default}
+.sp-scope .sk-pvc{background:#fff;border-radius:12px;width:min(760px,92vw);max-height:84vh;display:flex;
+  flex-direction:column;gap:8px;padding:14px 16px;cursor:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.sp-scope .sk-pvt{font-size:14px;font-weight:600;color:var(--tx)}
+.sp-scope .sk-pvb{flex:1;overflow:auto;margin:0;padding:10px 12px;background:#f6f7fa;border-radius:8px;
+  font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-word;color:var(--tx);
+  font-family:ui-monospace,Menlo,Consolas,monospace}
+.sp-scope .sk-pvf{font-size:11px;line-height:1.6;color:var(--tx2)}
+
+/* 2026-11-07：本页拆两个视图（表情包 / 情绪书），切 tab 只换内容区 */
+.sp-scope .stk-tabs{display:flex;gap:6px;margin:0 0 10px}
+.sp-scope .stk-tab{font-size:12px;border:1px solid var(--bd2);background:#fff;color:var(--tx2);
+  border-radius:999px;padding:4px 15px;cursor:pointer;line-height:1.5;
+  transition:background .12s,color .12s,border-color .12s}
+.sp-scope .stk-tab:hover{border-color:#9aa3b2;color:var(--tx)}
+.sp-scope .stk-tab.on{background:#1f2937;color:#fff;border-color:#1f2937}
+
+/* 判错的标记（主人 2026-11-07 定）：单张图打小点，整块标黄 */
+.sp-scope .eb-th.err::after,
+.eb-wrap .eb-th.err::after{content:'';position:absolute;top:3px;right:3px;width:6px;height:6px;
+  border-radius:50%;background:#d97706;box-shadow:0 0 0 1.5px #fff}
+.sp-scope .eb-card.err,
+.eb-wrap .eb-card.err{background:#fffaf0;border-color:#f0c27a}
+.eb-wrap .eb-th{position:relative}

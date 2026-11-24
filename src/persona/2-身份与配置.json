@@ -1,0 +1,55 @@
+{
+  "_说明": "人设导出包·身份与配置。2026-10-23 从本项目 config.json 提取，只取和人设/身份有关的字段；连接信息和密钥（napcatToken、llm.apiKey、bilibili.cookie）故意不放，换框架时自己配。",
+  "botName": "虚幻",
+  "masterName": "主人",
+  "masterQQ": 100000000,
+  "masters": [
+    "100000000"
+  ],
+  "selfQQ": 100000000,
+  "oniiQQ": 100000000,
+  "oniiGroup": 100000000,
+  "testGroup": 100000000,
+  "people": {
+    "100000000": "欧尼酱",
+    "100000000": "元囮",
+    "100000000": "德川",
+    "100000000": "主人",
+    "100000000": "乙",
+    "100000000": "主人"
+  },
+  "peerAI": [
+    "100000000"
+  ],
+  "city": "上海",
+  "triggers": [
+    {
+      "id": "Tcall",
+      "words": [
+        "虚幻"
+      ],
+      "mode": "reply",
+      "say": "",
+      "note": "群里谁发「虚幻」，就当有人叫她——直接接一句（不受群节流限制）",
+      "enabled": true,
+      "groupOnly": true
+    }
+  ],
+  "files": {
+    "soul": "soul/F-全场景通用主人设/虚幻.md",
+    "extra": "",
+    "memory": "data/人物列表.md"
+  },
+  "noRegionReply": "可是我不知道你住在哪里QAQ...告诉我在哪个城市好不好",
+  "offline_line": "我现在有点忙，让我的主人替我回答吧",
+  "panel_order_提示词文件": [
+    "soul/F-全场景通用主人设/虚幻.md",
+    "data/说话风格.md",
+    "data/人物列表.md",
+    "data/网络热梗.md",
+    "data/人物喜好.md",
+    "data/guides/洛克王国.md",
+    "data/guides/渔力全开.md",
+    "data/guides/速速上菜.md"
+  ]
+}

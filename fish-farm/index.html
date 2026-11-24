@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#1d3b2a">
+<title>乙的像素农场 · Fishy Farm</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game" width="480" height="270"></canvas>
+
+    <div id="hud">
+      <div class="hud-chip" id="hud-season"><span class="hud-ico">🌱</span><span id="hud-date">春 1 日</span></div>
+      <div class="hud-chip" id="hud-clock"><span class="hud-ico" id="hud-weather">☀</span><span id="hud-time">6:00</span><span class="clockbar"><i id="clockfill"></i></span></div>
+      <div class="hud-chip gold" id="hud-gold"><span class="hud-ico">🪙</span><span id="gold-val">1500</span></div>
+      <div class="hud-chip energy"><span class="hud-ico">⚡</span><span class="ebar"><i id="efill"></i></span><span id="energy-val">100/100</span></div>
+      <div class="hud-chip loc" id="hud-loc">农场</div>
+    </div>
+
+    <div id="hint" class="hidden"></div>
+    <div id="toasts"></div>
+
+    <div id="toolbar"></div>
+
+    <div id="actions">
+      <button class="act-btn" id="btn-inv" title="背包 (I)">🎒<span>背包</span><kbd>I</kbd></button>
+      <button class="act-btn" id="btn-craft" title="制作 (C)">🔨<span>制作</span><kbd>C</kbd></button>
+      <button class="act-btn" id="btn-help" title="帮助 (H)">❔<span>帮助</span><kbd>H</kbd></button>
+      <button class="act-btn" id="btn-sound" title="声音">🔊</button>
+    </div>
+
+    <div id="touch" class="hidden">
+      <div id="dpad">
+        <button data-dir="up">▲</button>
+        <button data-dir="left">◀</button>
+        <button data-dir="right">▶</button>
+        <button data-dir="down">▼</button>
+      </div>
+      <button id="touch-act">动作</button>
+    </div>
+
+    <div id="modal-layer"></div>
+
+    <div id="title">
+      <div class="title-card">
+        <div class="title-art"><canvas id="title-art-canvas" width="192" height="96"></canvas></div>
+        <h1>乙的<span>像素农场</span></h1>
+        <p class="sub">FISHY FARM · 本鲸的鱼塘杂货铺开业了</p>
+        <div class="title-buttons">
+          <button id="btn-continue" class="primary hidden">继续游戏</button>
+          <button id="btn-new">新游戏</button>
+          <button id="btn-title-help">玩法说明</button>
+        </div>
+        <div class="credit">角色形象源自「溟月 / 蓝色乙」社区二创 · CC BY-NC-SA 4.0</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/game.js"></script>
+</body>
+</html>

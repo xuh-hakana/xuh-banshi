@@ -1,0 +1,179 @@
+{
+ "note": "色图判定评测集：P=色图（上一轮9张 + 本批前10张），N=不是色图（本批第11-20张）。图片从 DSH 附件目录复制到 data/temp/porn-eval/，不入库。",
+ "items": [
+  {
+   "id": "P01",
+   "name": "q累16",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/f0/f0c2c51a112b474ea78637a805c1be7020d5927943a05385b0b7237e80258699"
+  },
+  {
+   "id": "P02",
+   "name": "q累17",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/02/024e2e7bb4b3657f2a7e47c6a38c4a722061dd891c0af81d20438436dcb9fab7"
+  },
+  {
+   "id": "P03",
+   "name": "q累25",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/b1/b109cc0203a6a881efc210e0e454a7829fce49d4688c434f8290a6ff6894d5fc"
+  },
+  {
+   "id": "P04",
+   "name": "q累15",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/d2/d21fb10c807c9d2874b172ab5254e9b3baec2d9be82fb2fa850d934149dc0e8b"
+  },
+  {
+   "id": "P05",
+   "name": "q累11",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/5d/5d83b910eb52abd2933d329469a8ecff0fe4f6458a65d44f878e5774cba3e4ff"
+  },
+  {
+   "id": "P06",
+   "name": "q累12",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/3a/3ae3a68cff38e58655f9eb4e9d695f0723bc23db3cba6ca6dd39d5952bd9b703"
+  },
+  {
+   "id": "P07",
+   "name": "q害怕64",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/6b/6ba239f9713a0c68975dac53ba0ff89bce51b1dbd14630b9975fdcd9932af9cf"
+  },
+  {
+   "id": "P08",
+   "name": "q害怕65",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/3d/3dcdc5b15939bf63a05fe75d1f9ed8cb3575888923cbdab564b0775ecdc1c1ab"
+  },
+  {
+   "id": "P09",
+   "name": "q害怕33",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/20/20450ff13055f0c79854d7eb9c74395f6914922c67e17a01a20dc7b3a3668ca0"
+  },
+  {
+   "id": "P10",
+   "name": "q无语266",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/84/84bd499050153509eafb143558bec3a8d4c6f8dbda6d82d89a21b0618d4a8a29"
+  },
+  {
+   "id": "P11",
+   "name": "q无语204",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/a8/a8a32a8538311b836ce3138d19a9a483aa438695164a97af695b2266195e9f2b"
+  },
+  {
+   "id": "P12",
+   "name": "q无语188",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/53/53c0f8e84f61d3620f72735d78b54a4d3559130a64f0f545d390a8491e84c025"
+  },
+  {
+   "id": "P13",
+   "name": "q无语152",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/a6/a69471ba432457f48b7aa652a288aa4c11f4707b4872a45521765129e5db02b8"
+  },
+  {
+   "id": "P14",
+   "name": "q无语151",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/a0/a0b164ef3f7e3e7be1d86f038f33163e30af730220cc1f9f5fbcdb0729b622d4"
+  },
+  {
+   "id": "P15",
+   "name": "q无语671",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/9d/9d9f125fb8e99ab0c45edfdc0fdaaed66f445f92debba36077d17e2b2259617c"
+  },
+  {
+   "id": "P16",
+   "name": "q无语700",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/cf/cfa86602afd474517bde2f3eff5d29fbb43885ad64d1b05a93e8813d35568fd1"
+  },
+  {
+   "id": "P17",
+   "name": "q无语748",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/7f/7f75d00b09cb49b4674bf76c1e66ecd2134e08d8e3a666c57ddfdb2f0d20594b"
+  },
+  {
+   "id": "P18",
+   "name": "q无语737",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/ae/aee4fad3abc8a28ff90a8e8e8cefb1e1850c7f77517f71226ea74907e27294e1"
+  },
+  {
+   "id": "P19",
+   "name": "q无语244",
+   "label": "porn",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/3e/3e4c24078872edc9bae2df692f2544671239b9ccb8e27da3846a1c9d8800759d"
+  },
+  {
+   "id": "N01",
+   "name": "q无语161",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/0c/0c43acb39dabcf5033af9b67b10fa11a60ba880477aad4c140c8f835690ad1ca"
+  },
+  {
+   "id": "N02",
+   "name": "q无语126",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/18/18e2aac7c2e0b5bb8e96ed886b82c975846da9989691e29742cf9e269ed84825"
+  },
+  {
+   "id": "N03",
+   "name": "q害怕50",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/09/09004f891add317f85abe9e98cdf6a93fa95453d60cbb92a00e5f3c33fefaf29"
+  },
+  {
+   "id": "N04",
+   "name": "q害怕44",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/09/09866fbf75f2f602c8a4f8f819224ce71e410554b0062c723491b64d4b1b1b9f"
+  },
+  {
+   "id": "N05",
+   "name": "q害怕66",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/39/39ac1b202fc967cc877ecda69f9104d71fb5bead8e9d78ee18948f42db9d4d7c"
+  },
+  {
+   "id": "N06",
+   "name": "q难过29",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/f5/f5796a9c8176a1a923b87c705d3161b11be65cea3af2fbe29303ab7f20163faa"
+  },
+  {
+   "id": "N07",
+   "name": "q委屈89",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/37/3716aeb0f94dbb4a745fa4da1ab2bfaa8e72feb6729eb2f2e1806627a0499739"
+  },
+  {
+   "id": "N08",
+   "name": "q无语171",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/57/57b631cb5a4b9afa8cf9752b9f0215202bc09d3090a60b99913e96c47c966a6c"
+  },
+  {
+   "id": "N09",
+   "name": "q无语352",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/aa/aa7952b705c80f65df77326ca97304b0a08732a1f335abfe9745c578905493f6"
+  },
+  {
+   "id": "N10",
+   "name": "q无语714",
+   "label": "normal",
+   "src": "/Users/zhengbowen/.dsh/attachments/v1/objects/86/868a40f5fef2a2ab680c2c3725bac15dcdfe6275a8d09776d77b6a85d94a580f"
+  }
+ ]
+}
