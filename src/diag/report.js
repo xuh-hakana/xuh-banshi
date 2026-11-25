@@ -11,6 +11,10 @@
  *   - 一律自吞异常：上报本身永远不许把主流程带崩。
  *   - 同一个 area 60 秒内只记一条，避免刷屏把日志写爆。
  *   - 行格式：[YYYY-MM-DD HH:MM:SS] [ERRO] [area] 消息
+ *
+ * 2026-11-25 加 wrap / wrapAsync / installProcessHooks：
+ *   包一层就同时拥有"记一条 + 明确失败"，不用每个调用点手写 try/catch。
+ *   进程级兜底钩子装一次，跑到一半没人接的 Promise 拒绝就不会再无声消失。
  * =========================================================================== */
 const fs = require('fs');
 const os = require('os');
@@ -43,4 +47,51 @@ function report(area, err, extra) {
   } catch (e) { return { ok: false, why: e.message }; }
 }
 
-module.exports = { report, LOG };
+/* wrap(area, fn, onErr)
+ *   onErr 不给：记一条再往上抛（上层还有 catch 时行为不变，只是多了一条线索）
+ *   onErr 是函数：它的返回值当兜底值（就地吞掉，进程不崩）
+ *   onErr 是别的值：直接当兜底返回值 */
+function wrap(area, fn, onErr) {
+  return function wrapped() {
+    try {
+      return fn.apply(this, arguments);
+    } catch (e) {
+      report(area, e);
+      if (typeof onErr === 'function') { try { return onErr.apply(this, arguments); } catch (e2) { report(area + '.fallback', e2); return undefined; } }
+      if (onErr !== undefined) return onErr;
+      throw e;
+    }
+  };
+}
+
+function wrapAsync(area, fn, onErr) {
+  return async function wrappedAsync() {
+    try {
+      return await fn.apply(this, arguments);
+    } catch (e) {
+      report(area, e);
+      if (typeof onErr === 'function') { try { return await onErr.apply(this, arguments); } catch (e2) { report(area + '.fallback', e2); return undefined; } }
+      if (onErr !== undefined) return onErr;
+      throw e;
+    }
+  };
+}
+
+/* 进程级兜底：装一次就够，重复装会自动跳过。
+ * 以前某个 Promise 拒绝没人接、或某处同步抛出没人 catch，Node 直接打一行就退出/继续跑，
+ * 事后既看不到现场也不知道是哪来的——现在统一落到错误日志里。 */
+let _hooksOn = false;
+function installProcessHooks(tag) {
+  if (_hooksOn) return false;
+  _hooksOn = true;
+  const t = String(tag || 'process');
+  process.on('unhandledRejection', (e) => {
+    report(t + '.unhandledRejection', e instanceof Error ? e : new Error(String(e)));
+  });
+  process.on('uncaughtException', (e) => {
+    report(t + '.uncaughtException', e instanceof Error ? e : new Error(String(e)));
+  });
+  return true;
+}
+
+module.exports = { report, wrap, wrapAsync, installProcessHooks, LOG };

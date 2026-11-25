@@ -59,7 +59,10 @@ function inbox(k, entry) {
           require('../util/atomic').writeFileAtomic(file, again.slice(-MAX_LINES).join('\n') + '\n');
         }, { ttlMs: 5000, waitMs: 2000 });
       }
-    } catch (e) {}
+    } catch (e) {
+      // 裁剪失败不影响入队，但要让守望看见（否则 inbox 会一直变长没人知道）
+      try { require('../diag/report').report('multi-truth.trim', e, { file: file }); } catch (e2) {}
+    }
     return { ok: true, file };
   } catch (e) { return { ok: false, why: e.message }; }
 }

@@ -1,15 +1,15 @@
 {
-  "name": "xuhbot",
+  "name": "xuh-banshi",
   "version": "0.4.0",
   "private": false,
   "description": "虚幻 — QQ 陪伴机器人（NapCat + OneBot 11 + LLM），含管理面板与桌面客户端",
   "main": "src/bot.js",
   "author": "虚幻 (xuh-hakana)",
   "license": "MIT",
-  "homepage": "https://github.com/xuh-hakana/xuhbot",
+  "homepage": "https://github.com/xuh-hakana/xuh-banshi",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xuh-hakana/xuhbot.git"
+    "url": "https://github.com/xuh-hakana/xuh-banshi.git"
   },
   "engines": {
     "node": ">=22"

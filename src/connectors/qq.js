@@ -369,6 +369,8 @@ function reportSendFail(action, params, why, tries, onResult) {
   sendFailSeen.set(k, now);
   if (sendFailSeen.size > 200) sendFailSeen.clear();
   try { core.aiFeedback('消息没发出去', desc + '｜原因：' + why + '｜重发 ' + tries + ' 次都没成'); } catch {}
+  // 发送彻底失败是"她突然不回话"的常见原因，但只有控制台看得到；进错误日志才查得到源头
+  try { require('../diag/report').report('qq.send', new Error(why || '发送失败'), { action: action, tries: tries + 1 }); } catch {}
 }
 
 // 要等结果的接口（查资料卡地区）
@@ -2707,7 +2709,7 @@ function atNameConvert(ans, ev) {              // @ 当名字：@ 别人转成�
     return nm ? '@' + nm : ' ';
   });
   // 裸的 QQ 号**不再替换**（主人 2026-10-23 修，这是一处过度限制）：
-  // 旧代码 `out.split(号).join('主人')` 把「主人的QQ号是 1000000002 和 3486543800」
+  // 旧代码 `out.split(号).join('主人')` 把「主人的QQ号是 1000000002 和 1000000005」
   // 改成了「主人的QQ号就是主人和主人」——群友问号她答不出来，根子就在这一行。
   // 现在号原样保留；「没人问就别主动报」由提示词把关（人设优先，不做硬改）。
   return noFakeJoin(stripEchoJunk(out));

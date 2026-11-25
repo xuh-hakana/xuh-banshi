@@ -2454,7 +2454,7 @@ function htmlReviewCard(x) {
     })() : ''}
     ${x.rkind === 'alias' ? (() => {
       /* 代称卡（主人 2026-11-13）：「没显示全我的QQ？只需要和「朋友录」的对应就可以了。」
-       * 账号行跟朋友录一模一样（QQ 1000000002 · QQ 3486543800 · B站 30895294）；
+       * 账号行跟朋友录一模一样（QQ 1000000002 · QQ 1000000005 · B站 30895294）；
        * 称呼行把名字和代称摆在同一条线上，第一个就是名字。 */
       const acc = (x.accounts || []).map(a => plab(a.platform) + ' ' + a.id).join(' · ') || '（没有账号）';
       const list = String(x.text || '').split('、').filter(Boolean);

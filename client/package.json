@@ -1,5 +1,5 @@
 {
-  "name": "xuhbot-client",
+  "name": "xuh-banshi-client",
   "version": "0.4.0",
   "private": true,
   "description": "虚幻 · 桌面客户端（Electron 主进程 + 原版雨夜玻璃界面；公开版只留表情包 / 搬屎 / 参数开关）",

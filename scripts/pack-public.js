@@ -1,5 +1,5 @@
 'use strict';
-/* 发布打包：把「能装能跑」的那部分挑出来放到 dist/xuhbot-public-<version>/
+/* 发布打包：把「能装能跑」的那部分挑出来放到 dist/xuh-banshi-public-<version>/
  * 原则：只发代码 + 模板 + 文档；媒体（src/data 下 2.5G）、本机备份、Electron 安装包、真实密钥一律不发。
  * 用法：npm run pack:public        产物目录会先清空再重建。
  * 打包完自动跑 scripts/scan-secrets.js，有命中就退出码 1（不会产出干净的包）。 */
@@ -9,7 +9,7 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const pkg = require(path.join(ROOT, 'package.json'));
-const OUT = path.join(ROOT, 'dist', 'xuhbot-public-' + pkg.version);
+const OUT = path.join(ROOT, 'dist', 'xuh-banshi-public-' + pkg.version);
 
 const SKIP_ANY = /(^|\/)(node_modules|\.git|__pycache__|\.DS_Store)(\/|$)/;
 const SKIP_FILE = /\.(log|tmp|bak|bak2|swp)$|\.bak[^/]*$/i;
@@ -44,7 +44,8 @@ function copyOne(rel) {
 }
 
 const SECRET_KEY = /^(apiKey|api_key|apikey|key|token|secret|password|cookie|session|accessToken|refreshToken|napcatToken)$/i;
-const ID_KEY = /(QQ|qq|uid|uin|groupId|Group)$/;
+// 数字数组（masters / peerAI / people…）和单值字段一样要清，不然真实 QQ 号会跟着配置出去
+const ID_KEY = /(QQ|qq|uid|uin|groupId|Group|masters|peerAI|peers|admins|owners|friends|members)$/i;
 
 function clean(v, key) {
   if (v === null || v === undefined) return v;
@@ -92,18 +93,22 @@ function ownerNumbers() {
     const c = JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'config', 'connect.json'), 'utf8'));
     for (const k of Object.keys(c)) {
       const v = c[k];
-      if (v && typeof v === 'object') { for (const kk of Object.keys(v)) add(vv = v[kk]); }
+      if (v && typeof v === 'object') { for (const kk of Object.keys(v)) add(v[kk]); }
       else add(v);
     }
   } catch (e) {}
   return out;
 }
 
-function scrubCopied() {
-  const ids = ownerNumbers();
+function ownerMap() {
   const map = new Map();
   let n = 0;
-  for (const id of ids) map.set(id, '10000000' + String(++n).padStart(2, '0'));
+  for (const id of ownerNumbers()) map.set(id, '10000000' + String(++n).padStart(2, '0'));
+  return map;
+}
+
+function scrubCopied(mapArg) {
+  const map = mapArg || ownerMap();
   const TEXT = /\.(js|json|md|txt|py|sh|command|bat|html|css|yml|yaml)$/i;
   const walkOut = dir => {
     for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -127,10 +132,32 @@ function scrubCopied() {
           return seen.get(num);
         });
       }
+      // 数字 key（persona 里 "QQ号": "称呼" 这种 map）也要换，clean() 只清 value 不清 key
+      s = s.replace(/"([1-9]\d{8,11})"(\s*:)/g, (m0, d, tail) => (map.get(d) ? '"' + map.get(d) + '"' + tail : m0));
       if (s !== before) fs.writeFileSync(p, s, 'utf8');
     }
   };
   walkOut(OUT);
+}
+
+/* 收尾自检：作者本机号码一个都不许留在包里（含 code 注释和 json key） */
+function leakCheck(map) {
+  const TEXT = /\.(js|json|md|txt|py|sh|command|bat|html|css|yml|yaml)$/i;
+  const bad = [];
+  (function walkOut3(dir) {
+    for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+      const q = path.join(dir, d.name);
+      if (d.isDirectory()) { walkOut3(q); continue; }
+      if (!TEXT.test(d.name)) continue;
+      let s = '';
+      try { s = fs.readFileSync(q, 'utf8'); } catch (e) { continue; }
+      for (const id of map.keys()) if (s.indexOf(id) >= 0) bad.push(path.relative(OUT, q) + '→' + id);
+    }
+  })(OUT);
+  if (bad.length) {
+    console.log('[pack] 隐私残留 ' + bad.length + ' 处：' + bad.slice(0, 6).join('、'));
+    process.exit(1);
+  }
 }
 
 function main() {
@@ -182,6 +209,10 @@ function main() {
     } catch (e) {}
   }
 
+  const idMap = ownerMap();
+  if (!idMap.size) { console.log('[pack] 读不到 src/config/connect.json 里的号码，去敏没法做 —— 先补配置'); process.exit(1); }
+  scrubCopied(idMap);
+  leakCheck(idMap);
   fs.mkdirSync(path.join(OUT, 'src', 'data'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'src/data/README.md'), DATA_README, 'utf8');
   for (const d of ['src/data/stickers/常用', 'src/data/stickers/可用', 'src/data/blocked', 'src/data/guides', 'src/data/usage', 'src/persona/1-人设正文', 'src/persona/6-记忆数据']) {
@@ -211,4 +242,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { main, OUT, clean };
+module.exports = { main, OUT, clean, ownerMap, leakCheck };

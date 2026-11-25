@@ -482,7 +482,7 @@ async def _heal_queue_from_history(self):
     if bot is None or self._heal_done:
         return
     self._heal_done = True
-    count = max(0, self._int("backfill_count", 100))
+    count = max(0, self._int("backfill_count", 0))   # 2026-11-25 默认不补收历史
     if count <= 0:
         return
     total = 0
@@ -523,6 +523,9 @@ async def _fingerprint_local(self, segs):
 
 
 async def _reconcile_archive(self):
+    # 2026-11-25：每次重启把 7 天归档再灌一遍队列 = 老屎重复之源，默认关。
+    if not self._bool("reconcile_archive_enabled", False):
+        return
     """归档里收到过但队列里缺的，补成任务（只补未发对）。"""
     if not self._bool("enabled", True):
         return
@@ -561,6 +564,9 @@ async def _reconcile_archive(self):
 
 
 async def _recover_from_backup(self, job=None):
+    # 2026-11-25：把 v1 队列整个重搬一遍 = 已发内容再进队列，默认关。
+    if not self._bool("recover_from_backup_enabled", False):
+        return
     """v2 恢复：把 v1 队列（现存的 queue.json）再搬一遍，幂等补漏。"""
     if not os.path.exists(QUEUE_FILE):
         return

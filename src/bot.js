@@ -66,6 +66,9 @@ function logErr(tag, e) {
   const line = new Date().toISOString() + ' [' + tag + '] ' + ((e && e.stack) || e) + '\n';
   try { fs.appendFileSync(ERR_LOG, line); } catch {}
   try { console.error('[兜底] ' + tag + '：' + ((e && (e.message || e)) || '')); } catch {}
+  /* 2026-11-25：兜底日志只有本机知道，守望任务看不到。同步进 xuhbot-error.log，
+   * 这样"跑着跑着就不说话了"这种没有源头线索的掉线也能被扫到。 */
+  try { require('./diag/report').report('bot.' + tag, e instanceof Error ? e : new Error(String((e && (e.message || e)) || e))); } catch {}
 }
 process.on('uncaughtException', e => logErr('没人接的异常', e));
 process.on('unhandledRejection', e => logErr('没人接的 Promise', e));

@@ -69,8 +69,12 @@ function writeAll(list) {
   try {
     fs.mkdirSync(path.dirname(DATA), { recursive: true });
     const tmp = DATA + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(list, null, 2) + '\n', 'utf8');
-    fs.renameSync(tmp, DATA);
+    if (path.resolve(DATA) === path.resolve(require('./state/entities').F.alarms)) {
+      require('./state/entities').ent().alarms.replace(list);
+    } else {
+      fs.writeFileSync(tmp, JSON.stringify(list, null, 2) + '\n', 'utf8');
+      fs.renameSync(tmp, DATA);
+    }
     return true;
   } catch (e) { console.error('[闹钟] 写不进：' + e.message); return false; }
 }

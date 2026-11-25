@@ -25,8 +25,8 @@ function saveNow() {
       keys.sort((a, b) => (Number(_idx.byId[b].t) || 0) - (Number(_idx.byId[a].t) || 0));
       for (const k of keys.slice(MAX)) delete _idx.byId[k];
     }
-    fs.mkdirSync(path.dirname(FILE), { recursive: true });
-    fs.writeFileSync(FILE, JSON.stringify(_idx), 'utf8');
+    // 走实体：跨进程锁 + 原子写，面板/机器人都写这张台账时不会写坏
+    require('./state/entities').ent().mediaIndex.replace(_idx);
     _dirty = false;
   } catch (e) {
     try { require('./err-log.js').logErr('media-index', 'save failed', { msg: e.message }); } catch (e2) {}

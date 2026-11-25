@@ -53,6 +53,8 @@ const _BKREL = path.relative(ROOT, stickerPaths.blockedRoot()).split(path.sep).j
 // xuhctrl/data（页面上看起来就是「数据全没了」）。
 const WEB = path.join(__dirname, '..', '..', 'public');   // 前端页面在 public/
 const PORT = Number(process.env.PANEL_PORT || 8899);
+/* 面板进程同样装兜底：写接口里任何漏网的 Promise 拒绝都不会再无声消失 */
+try { require('../diag/report').installProcessHooks('panel'); } catch (e) {}
 
 // 进程级兜底（真人真事 2026-10-22：/api/favor 里一个未定义变量把整个面板打崩）。
 // 单个接口出错只记日志，面板进程不再死——刷新一下就行，不用人去重启。
@@ -2551,8 +2553,14 @@ function logWrite(route, d, ok, error, ms) {
     const line = JSON.stringify({ t: new Date().toISOString(), route, req: brief, ok: !!ok, error: String(error || '').slice(0, 200), ms: Number(ms) || 0 });
     fs.appendFileSync(WRITE_LOG, line + '\n', 'utf8');
     if (fs.statSync(WRITE_LOG).size > 800 * 1024) {   // 大约两千行滚一刀
-      const keep = fs.readFileSync(WRITE_LOG, 'utf8').trim().split('\n').slice(-1200);
-      fs.writeFileSync(WRITE_LOG, keep.join('\n') + '\n', 'utf8');
+      // 滚动是读-改-写，必须上锁，否则两个进程同时滚会把日志截断成半截
+      require('../state/lock').withLock(WRITE_LOG, () => {
+        if (fs.statSync(WRITE_LOG).size <= 800 * 1024) return;
+        const keep = fs.readFileSync(WRITE_LOG, 'utf8').trim().split('\n').slice(-1200);
+        const tmp = WRITE_LOG + '.tmp-' + process.pid;
+        fs.writeFileSync(tmp, keep.join('\n') + '\n', 'utf8');
+        fs.renameSync(tmp, WRITE_LOG);
+      }, { waitMs: 2000 });
     }
   } catch { /* 日志写不了不能影响正常保存 */ }
 }
@@ -2564,8 +2572,21 @@ function handler(req, res) {
   req.on('data', c => { body += c; if (body.length > 30e6) req.destroy(); });   // 30MB：动态一次最多 9 张图（base64）
   req.on('end', async () => {
     const _t0 = Date.now();
+    /* 接口护栏（2026-11-25）：以前任何方法都往下走、body 解析失败静默当 {}，
+     * 结果写接口收到垃圾时给出"成功了"的假象，事后查不出谁写坏的。现在：
+     *   /api/ 只认 GET/POST，其它方法 405 并带 Allow；
+     *   body 不是合法 JSON 就 400 + 报错上报，不再假装成功。 */
+    if (String(req.url || '').startsWith('/api/') && req.method !== 'GET' && req.method !== 'POST') {
+      res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8', Allow: 'GET, POST' });
+      return res.end(JSON.stringify({ ok: false, error: '只支持 GET/POST' }));
+    }
     let d = {};
-    try { d = body ? JSON.parse(body) : {}; } catch {}
+    if (body) {
+      try { d = JSON.parse(body); } catch (e) {
+        try { require('../diag/report').report('panel.body', e, { url: String(req.url).slice(0, 120) }); } catch (e2) {}
+        return send(400, 'application/json; charset=utf-8', JSON.stringify({ ok: false, error: 'body 不是合法 JSON' }));
+      }
+    }
 
     if (req.method === 'GET' && (req.url === '/' || req.url.startsWith('/?'))) return sendFile(res, 'panel.html', 'text/html');
     if (req.method === 'GET' && req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
@@ -2972,6 +2993,19 @@ function handler(req, res) {
     // ===== 保健提醒（2026-11-10 主人定）：配置、四个池、按人约定，客户端这一页全都能看能改 =====
     // 写入复用 configStore.patch（按分区原子落盘，机器人 cfgLive 热读，改完不用重启）与
     // core.addonSet（约定和说话方式约定同一份 topics.jsonl，不另建数据文件）。
+    /* 共享可写状态的体检口（2026-11-25）：谁在写、写了多少、卡过锁没有、
+     * 有没有解析失败被备份。排查"面板写的和机器人读的不一致"时先看这里。 */
+    if (req.method === 'GET' && req.url === '/api/diag/stores') {
+      try {
+        // 先把实体表建起来，否则没被写过的那几份不会出现在列表里（看起来像漏登记）
+        try { require('../state/entities').ent(); } catch (e0) {}
+        const st = require('../state/store');
+        return json({ ok: true, stores: st.list() });
+      } catch (e) {
+        try { require('../diag/report').report('panel.diag.stores', e); } catch (e2) {}
+        return json({ ok: false, error: e.message });
+      }
+    }
     if (req.method === 'GET' && req.url === '/api/healthremind') {
       const full = configStore.load();
       const h = full.healthRemind || {};

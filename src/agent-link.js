@@ -889,4 +889,24 @@ function status() {
   };
 }
 
-module.exports = { start, stop, runTask, status };
+/* runTask 是"派活给 DSH"的唯一出口，失败原来只 console 一行，重启就没了。
+ * 包一层：出错先落进错误日志（同一个 area 一分钟一条），再按原样往上抛，
+ * 上层看到的返回/异常不变。 */
+const _runTaskRaw = runTask;
+function runTaskTraced() {
+  try {
+    const r = _runTaskRaw.apply(this, arguments);
+    if (r && typeof r.catch === 'function') {
+      return r.catch((e) => {
+        try { require('./diag/report').report('agent-link.runTask', e); } catch (e2) {}
+        throw e;
+      });
+    }
+    return r;
+  } catch (e) {
+    try { require('./diag/report').report('agent-link.runTask', e); } catch (e2) {}
+    throw e;
+  }
+}
+
+module.exports = { start, stop, runTask: runTaskTraced, status };

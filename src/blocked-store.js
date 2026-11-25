@@ -56,7 +56,12 @@ function save(buf, kind, desc) {
     sp.ensure(sub);
     const name = k + '-' + md5.slice(0, 10) + _extOf(buf);
     const full = path.join(sub, name);
-    if (!fs.existsSync(full)) fs.writeFileSync(full, buf);
+    // 原子落盘 + 跨进程锁：抢同一张图时不会写出半截文件
+    require('./state/lock').withLock(full, () => {
+      const t = full + '.tmp-' + process.pid;
+      fs.writeFileSync(t, buf);
+      fs.renameSync(t, full);
+    }, { waitMs: 3000 });
     if (desc) { try { imgArchive.remember(md5, { desc: desc, kind: k, src: 'blocked' }); } catch (e) {} }
     prune();
     return sp.relOf(full);

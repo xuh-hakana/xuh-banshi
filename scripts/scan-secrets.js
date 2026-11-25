@@ -1,6 +1,6 @@
 'use strict';
 /* 密钥 / 隐私扫描（发布前硬拦）：只报文件+行号+规则名，不打印命中内容本身。
- * 用法：node scripts/scan-secrets.js [目录]   （默认 dist/xuhbot-public-<version>）
+ * 用法：node scripts/scan-secrets.js [目录]   （默认 dist/xuh-banshi-public-<version>）
  * 退出码 1 = 有命中，发布脚本会因此中止。 */
 const fs = require('fs');
 const path = require('path');
@@ -55,7 +55,7 @@ function scan(dir) {
   return { files: files.length, hits };
 }
 
-const target = path.resolve(process.argv[2] || path.join(ROOT, 'dist', 'xuhbot-public-' + require(path.join(ROOT, 'package.json')).version));
+const target = path.resolve(process.argv[2] || path.join(ROOT, 'dist', 'xuh-banshi-public-' + require(path.join(ROOT, 'package.json')).version));
 const r = scan(target);
 for (const h of r.hits.slice(0, 40)) console.log('[secret] ' + h.file + ':' + h.line + '  ' + h.rule);
 if (r.hits.length) { console.log('FAIL 命中 ' + r.hits.length + ' 处（扫了 ' + r.files + ' 个文本文件）'); process.exit(1); }

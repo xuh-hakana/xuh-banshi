@@ -274,7 +274,9 @@ def scan(d, st, dry=False, start0=False):
     now = time.time()
     agg = st.setdefault('agg', {})
     for path in srcs():
-        lines = read_new(st, path, dry or start0)
+        # 默认增量：--dry-run 不再强制从头读整份日志（1.6MB 全扫 2.2s）；
+        # 要全量重扫显式加 --from-start。
+        lines = read_new(st, path, start0)
         bl = blocks(lines)
         if path.endswith('.ips') and lines and not bl:
             bl = [['崩溃报告 ' + os.path.basename(path)] + lines[:20]]
@@ -338,6 +340,7 @@ def main():
     ap.add_argument('--status', action='store_true')
     ap.add_argument('--ack')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--poll', action='store_true')
     ap.add_argument('--from-start', action='store_true')
     ap.add_argument('--sweep', action='store_true')
     ap.add_argument('--timeout', type=int, default=3600)
@@ -365,6 +368,20 @@ def main():
     os.makedirs(d, exist_ok=True)
     load_mute(d)
     st = load(d)
+
+    if a.poll:
+        # 一次调用拿到：增量扫描结果 + 队列状态 + 未处理指纹（省掉 status→once 两次往返）
+        found = scan(d, st)
+        save(d, st)
+        if found:
+            push(d, found)
+        un = [r for r in qread(d) if not r.get('acked')]
+        print(json.dumps({'n_src': len(srcs()), 'seen': len(st['seen']),
+                          'unacked': len(un), 'push_hour': len(st.get('pushTimes', [])),
+                          'new': len(found),
+                          'unacked_fps': [r.get('fp') for r in un][:10]},
+                         ensure_ascii=False))
+        return
 
     if a.status:
         un = [r for r in qread(d) if not r.get('acked')]

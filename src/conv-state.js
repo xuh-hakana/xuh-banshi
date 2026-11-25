@@ -81,11 +81,8 @@ function clone(o) {
 }
 
 function writeAll(o) {
-  const dir = path.dirname(FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const tmp = FILE + '.tmp-' + process.pid;
-  fs.writeFileSync(tmp, JSON.stringify(o, null, 1), 'utf8');
-  fs.renameSync(tmp, FILE);
+  // 走实体：跨进程锁 + tmp/fsync/rename，面板和机器人同时写不会互相盖
+  require('./state/entities').ent().convState.replace(o);
   cache = o;
   try { stamp = fs.statSync(FILE).mtimeMs; } catch { stamp = 0; }
 }

@@ -9290,7 +9290,7 @@ function reviewAll() {
       a.push({
         id: 'alias:' + pers.pid, rkind: 'alias', pid: pers.pid,
         qq: mainQQ ? people.keyOf(mainQQ) : '', scope: '',
-        // 这个人的全部账号，前端照着「朋友录」的写法列（QQ 1000000002 · QQ 3486543800 · B站 …）
+        // 这个人的全部账号，前端照着「朋友录」的写法列（QQ 1000000002 · QQ 1000000005 · B站 …）
         accounts: (pers.accounts || []).map(x => ({ platform: String(x.platform || ''), id: String(x.id || '') })),
         name: names[0] || '',
         t: new Date(raw.at || Date.now()).toISOString(),

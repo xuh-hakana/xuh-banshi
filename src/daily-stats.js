@@ -488,15 +488,29 @@ function writeSnapshot(day, m, dir) {
   try {
     const cur = (m && m.favorNow) || favorNow() || {};
     const p = snapPath(dir || (m && m.dataDir));
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify({
+    const snap = {
       day,
       people: m.people, groups: m.groups,
       topics: m.topics.topic, promises: m.topics.promise, searched: m.topics.searched,
       favor: cur,
-    }), 'utf8');
+    };
+    const en = require('./state/entities');
+    if (path.resolve(p) === path.resolve(en.F.dailyStats)) {
+      // 默认位置：走实体，跨进程锁 + 原子写
+      en.ent().dailyStats.replace(snap);
+    } else {
+      // 别的数据目录（AstrBot 插件目录）：同样原子写，别留半截 JSON
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      const tmp = p + '.tmp-' + process.pid;
+      fs.writeFileSync(tmp, JSON.stringify(snap), 'utf8');
+      fs.renameSync(tmp, p);
+    }
     return true;
-  } catch (e) { console.log('[日报] 快照写失败：' + e.message); return false; }
+  } catch (e) {
+    console.log('[日报] 快照写失败：' + e.message);
+    try { require('./diag/report').report('daily-stats.snapshot', e); } catch (e2) {}
+    return false;
+  }
 }
 
 /* ── 渲染 ─────────────────────────────────────────────────────────────── */
